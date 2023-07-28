@@ -36,7 +36,7 @@ static void Handler(int32_t sig) {
 }
 
 int32_t main(int32_t argc, char *argv[]) {
-  if (argc < 5 || argc > 7) {
+  if (argc < 5 || argc > 9) {
     const char *usage = R"usage(
 Usage:
   ./bin/sherpa-onnx-microphone \
@@ -76,6 +76,15 @@ for a list of pre-trained models to download.
   if (argc == 7) {
     config.decoding_method = argv[6];
   }
+
+  if (argc == 8) {
+    config.model_config.model_type = argv[7];
+  }
+
+  if (argc == 9) {
+    config.lm_config.model = argv[8];
+  }
+  
   config.max_active_paths = 4;
 
   config.enable_endpoint = true;
