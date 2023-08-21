@@ -66,6 +66,9 @@ SherpaOnnxOnlineRecognizer *CreateOnlineRecognizer(
   recognizer_config.max_active_paths =
       SHERPA_ONNX_OR(config->max_active_paths, 4);
 
+  recognizer_config.context_score =
+      SHERPA_ONNX_OR(config->context_score, 1.5);
+
   recognizer_config.enable_endpoint =
       SHERPA_ONNX_OR(config->enable_endpoint, 0);
 
@@ -98,6 +101,26 @@ SherpaOnnxOnlineStream *CreateOnlineStream(
     const SherpaOnnxOnlineRecognizer *recognizer) {
   SherpaOnnxOnlineStream *stream =
       new SherpaOnnxOnlineStream(recognizer->impl->CreateStream());
+  return stream;
+}
+
+SherpaOnnxOnlineStream *CreateOnlineStreamWithContext(
+    const SherpaOnnxOnlineRecognizer *recognizer,
+    const int32_t *const *context_list,
+    int32_t num_vectors,
+    const int32_t *vector_sizes) {
+
+  // Convert the raw pointers into a std::vector<std::vector<int32_t>>
+  std::vector<std::vector<int32_t>> context_list_vector;
+  for (int32_t i = 0; i < num_vectors; ++i) {
+    std::vector<int32_t> inner_vector(context_list[i], 
+                                      context_list[i] + vector_sizes[i]);
+    context_list_vector.push_back(inner_vector);
+  }
+
+  SherpaOnnxOnlineStream *stream =
+      new SherpaOnnxOnlineStream(
+        recognizer->impl->CreateStream(context_list_vector));
   return stream;
 }
 

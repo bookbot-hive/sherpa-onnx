@@ -108,12 +108,14 @@ func sherpaOnnxOnlineRecognizerConfig(
   rule2MinTrailingSilence: Float = 1.2,
   rule3MinUtteranceLength: Float = 30,
   decodingMethod: String = "greedy_search",
-  maxActivePaths: Int = 4
+  maxActivePaths: Int = 4,
+  contextScore: Float = 1.5
 ) -> SherpaOnnxOnlineRecognizerConfig {
   return SherpaOnnxOnlineRecognizerConfig(
     feat_config: featConfig,
     model_config: modelConfig,
     decoding_method: toCPointer(decodingMethod),
+    context_score: contextScore,
     max_active_paths: Int32(maxActivePaths),
     enable_endpoint: enableEndpoint ? 1 : 0,
     rule1_min_trailing_silence: rule1MinTrailingSilence,
@@ -177,10 +179,24 @@ class SherpaOnnxRecognizer {
 
   /// Constructor taking a model config and a decoder config.
   init(
-    config: UnsafePointer<SherpaOnnxOnlineRecognizerConfig>!
+    config: UnsafePointer<SherpaOnnxOnlineRecognizerConfig>!,
+    contextList: [[Int32]]? = nil
   ) {
-    recognizer = CreateOnlineRecognizer(config)
-    stream = CreateOnlineStream(recognizer)
+    if let validContextList = contextList {
+      // If contextList is provided
+      var vectorSizesRaw = validContextList.map { Int32($0.count) }
+
+      // Convert validContextList to a raw pointer representation
+      var contextListRaw: [UnsafePointer<Int32>?] = validContextList.map {
+        $0.withUnsafeBufferPointer { UnsafePointer<Int32>($0.baseAddress!) }
+      }
+      recognizer = CreateOnlineRecognizer(config)
+      stream = CreateOnlineStreamWithContext(recognizer, &contextListRaw, Int32(validContextList.count), &vectorSizesRaw)
+    } else {
+      // If contextList is not provided
+      recognizer = CreateOnlineRecognizer(config)
+      stream = CreateOnlineStream(recognizer)
+    }
   }
 
   deinit {
