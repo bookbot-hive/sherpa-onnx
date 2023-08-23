@@ -33,6 +33,7 @@ data class OnlineModelConfig(
     var debug: Boolean = false,
     var provider: String = "cpu",
     var modelType: String = "",
+    var contextScore: Float = 2.0f
 )
 
 data class OnlineLMConfig(
