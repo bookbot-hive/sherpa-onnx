@@ -81,6 +81,7 @@ class SherpaOnnx(
     fun decode() = decode(ptr)
     fun isEndpoint(): Boolean = isEndpoint(ptr)
     fun isReady(): Boolean = isReady(ptr)
+    fun createContextStream(contextList: Array<IntArray>) = createContextStream(ptr, contextList)
 
     val text: String
         get() = getText(ptr)
@@ -103,6 +104,7 @@ class SherpaOnnx(
     private external fun decode(ptr: Long)
     private external fun isEndpoint(ptr: Long): Boolean
     private external fun isReady(ptr: Long): Boolean
+    private external fun createContextStream(ptr: Long, contextList: Array<IntArray>)
 
     companion object {
         init {

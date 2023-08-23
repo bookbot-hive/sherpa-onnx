@@ -23,6 +23,8 @@
 #include "sherpa-onnx/csrc/online-recognizer.h"
 #include "sherpa-onnx/csrc/onnx-utils.h"
 #include "sherpa-onnx/csrc/wave-reader.h"
+#include <vector>
+#include <iostream>
 
 #define SHERPA_ONNX_EXTERN_C extern "C"
 
@@ -70,6 +72,10 @@ class SherpaOnnx {
   void Reset() const { return recognizer_.Reset(stream_.get()); }
 
   void Decode() const { recognizer_.DecodeStream(stream_.get()); }
+
+  void CreateContextStream(std::vector<std::vector<int32_t>> context_list) { 
+    stream_ = recognizer_.CreateStream(context_list);
+  }
 
  private:
   OnlineRecognizer recognizer_;
@@ -229,6 +235,9 @@ static OnlineRecognizerConfig GetConfig(JNIEnv *env, jobject config) {
   p = env->GetStringUTFChars(s, nullptr);
   ans.model_config.model_type = p;
   env->ReleaseStringUTFChars(s, p);
+
+  fid = env->GetFieldID(model_config_cls, "contextScore", "F");
+  ans.context_score = env->GetFloatField(model_config, fid);
 
   //---------- rnn lm model config ----------
   fid = env->GetFieldID(cls, "lmConfig",
@@ -620,4 +629,34 @@ JNIEXPORT jint JNICALL Java_com_k2fsa_sherpa_onnx_OnlineStream_featureDim(
   sherpa_onnx::OnlineStream *s =
       reinterpret_cast<sherpa_onnx::OnlineStream *>(s_ptr);
   return s->FeatureDim();
+}
+
+SHERPA_ONNX_EXTERN_C
+JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_SherpaOnnx_createContextStream(JNIEnv *env,
+                                                                    jobject /* obj */,
+                                                                    jlong ptr,
+                                                                    jobjectArray contextListArray) {
+                                                             
+  jsize outerArraySize = env->GetArrayLength(contextListArray);
+  std::vector<std::vector<int32_t>> context_list(outerArraySize);  
+
+  for (int i = 0; i < outerArraySize; ++i) {
+      jobject innerJavaArray = env->GetObjectArrayElement(contextListArray, i);
+      jintArray* innerArray = reinterpret_cast<jintArray*>(&innerJavaArray);
+      
+      jsize innerArraySize = env->GetArrayLength(*innerArray);
+      std::vector<int32_t> innerVec(innerArraySize);
+      
+      jint* innerArrayElements = env->GetIntArrayElements(*innerArray, 0);
+      for (int j = 0; j < innerArraySize; ++j) {
+          innerVec[j] = innerArrayElements[j];
+      }
+      
+      context_list[i] = innerVec;
+      
+      env->ReleaseIntArrayElements(*innerArray, innerArrayElements, 0);
+  }
+
+  auto model = reinterpret_cast<sherpa_onnx::SherpaOnnx *>(ptr);
+  model->CreateContextStream(context_list);  
 }
