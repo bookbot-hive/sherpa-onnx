@@ -52,7 +52,7 @@ data class OnlineRecognizerConfig(
     var lmConfig: OnlineLMConfig,
     var endpointConfig: EndpointConfig = EndpointConfig(),
     var enableEndpoint: Boolean = true,
-    var decodingMethod: String = "greedy_search",
+    var decodingMethod: String = "modified_beam_search",
     var maxActivePaths: Int = 4,
 )
 
@@ -274,6 +274,20 @@ fun getModelConfig(type: Int): OnlineModelConfig? {
                 modelType = "zipformer",
             )
         }
+
+        9 -> {
+            val modelDir = "asr"
+            return OnlineModelConfig(
+                transducer = OnlineTransducerModelConfig(
+                    encoder = "$modelDir/encoder.int8.onnx",
+                    decoder = "$modelDir/decoder.int8.onnx",
+                    joiner = "$modelDir/joiner.int8.onnx",
+                ),
+                tokens = "$modelDir/tokens.txt",
+                modelType = "zipformer2",
+                provider = "cpu"
+            )
+        }
     }
     return null;
 }
@@ -296,7 +310,7 @@ fun getOnlineLMConfig(type: Int): OnlineLMConfig {
         0 -> {
             val modelDir = "sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20"
             return OnlineLMConfig(
-                model = "$modelDir/with-state-epoch-99-avg-1.int8.onnx",
+                model = "",
                 scale = 0.5f,
             )
         }
@@ -307,7 +321,7 @@ fun getOnlineLMConfig(type: Int): OnlineLMConfig {
 fun getEndpointConfig(): EndpointConfig {
     return EndpointConfig(
         rule1 = EndpointRule(false, 2.4f, 0.0f),
-        rule2 = EndpointRule(true, 1.4f, 0.0f),
-        rule3 = EndpointRule(false, 0.0f, 20.0f)
+        rule2 = EndpointRule(true, 0.8f, 0.0f),
+        rule3 = EndpointRule(false, 0.0f, 30.0f)
     )
 }

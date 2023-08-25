@@ -116,6 +116,12 @@ class MainActivity : AppCompatActivity() {
         val interval = 0.1 // i.e., 100 ms
         val bufferSize = (interval * sampleRateInHz).toInt() // in samples
         val buffer = ShortArray(bufferSize)
+        val contextList: Array<IntArray> = arrayOf(
+            intArrayOf(27, 30, 27, 30),
+            intArrayOf(26, 14, 5, 11)
+        )
+
+        model.createContextStream(contextList)
 
         while (isRecording) {
             val ret = audioRecord?.read(buffer, 0, buffer.size)
@@ -177,12 +183,12 @@ class MainActivity : AppCompatActivity() {
         // Please change getModelConfig() to add new models
         // See https://k2-fsa.github.io/sherpa/onnx/pretrained_models/index.html
         // for a list of available models
-        val type = 0
-        println("Select model type ${type}")
+        val type = 9
+        println("Select model type $type")
         val config = OnlineRecognizerConfig(
             featConfig = getFeatureConfig(sampleRate = sampleRateInHz, featureDim = 80),
             modelConfig = getModelConfig(type = type)!!,
-            lmConfig = getOnlineLMConfig(type = type),
+            lmConfig = getOnlineLMConfig(type = 0),
             endpointConfig = getEndpointConfig(),
             enableEndpoint = true,
         )
