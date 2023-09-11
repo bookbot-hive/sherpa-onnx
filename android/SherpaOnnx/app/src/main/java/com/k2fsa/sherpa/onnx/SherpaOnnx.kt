@@ -274,6 +274,19 @@ fun getModelConfig(type: Int): OnlineModelConfig? {
                 modelType = "zipformer",
             )
         }
+
+        9 -> {
+            val modelDir = "sherpa-onnx-zipformer-streaming-robust-id"
+            return OnlineModelConfig(
+                transducer = OnlineTransducerModelConfig(
+                    encoder = "$modelDir/encoder-epoch-30-avg-5-chunk-16-left-128.int8.onnx",
+                    decoder = "$modelDir/decoder-epoch-30-avg-5-chunk-16-left-128.int8.onnx",
+                    joiner = "$modelDir/joiner-epoch-30-avg-5-chunk-16-left-128.int8.onnx",
+                ),
+                tokens = "$modelDir/tokens.txt",
+                modelType = "zipformer2",
+            )
+        }
     }
     return null;
 }
