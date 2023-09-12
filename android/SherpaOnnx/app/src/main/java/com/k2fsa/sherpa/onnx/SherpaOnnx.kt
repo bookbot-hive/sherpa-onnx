@@ -52,7 +52,7 @@ data class OnlineRecognizerConfig(
     var lmConfig: OnlineLMConfig,
     var endpointConfig: EndpointConfig = EndpointConfig(),
     var enableEndpoint: Boolean = true,
-    var decodingMethod: String = "greedy_search",
+    var decodingMethod: String = "modified_beam_search",
     var maxActivePaths: Int = 4,
 )
 
