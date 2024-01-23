@@ -238,7 +238,6 @@ class OnlineRecognizerTransducerImpl : public OnlineRecognizerImpl {
       }
     }
     s->SetResult(r);
-    s->SetStates(model_->GetEncoderInitStates());
     s->GetResult().decoder_out = std::move(decoder_out);
 
     // Note: We only update counters. The underlying audio samples
