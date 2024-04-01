@@ -2,8 +2,6 @@ name: build-wheels-linux
 
 on:
   push:
-    branches:
-      - wheel
     tags:
       - '*'
   workflow_dispatch:
@@ -12,7 +10,7 @@ env:
   SHERPA_ONNX_IS_IN_GITHUB_ACTIONS: 1
 
 concurrency:
-  group: build-wheels-${{ github.ref }}
+  group: build-wheels-linux-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -24,7 +22,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python-version: ["cp37", "cp38", "cp39", "cp310", "cp311", "cp312"]
-        manylinux: [manylinux2014, manylinux_2_28]
+        manylinux: [manylinux2014] #, manylinux_2_28]
 
 
     steps:
@@ -112,6 +110,7 @@ jobs:
         env:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        shell: bash
         run: |
           python3 -m pip install --upgrade pip
           python3 -m pip install wheel twine setuptools
@@ -119,16 +118,17 @@ jobs:
           twine upload ./wheelhouse/*.whl
 
       - name: Build sdist
-        if: matrix.python-version == 'cp38' && matrix.manylinux == 'manylinux_2_28'
+        if: matrix.python-version == 'cp38' && matrix.manylinux == 'manylinux2014'
         shell: bash
         run: |
           python3 setup.py sdist
           ls -l dist/*
 
       - name: Publish sdist to PyPI
-        if: matrix.python-version == 'cp38' && matrix.manylinux == 'manylinux_2_28'
+        if: matrix.python-version == 'cp38' && matrix.manylinux == 'manylinux2014'
         env:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        shell: bash
         run: |
           twine upload dist/sherpa-onnx-*.tar.gz

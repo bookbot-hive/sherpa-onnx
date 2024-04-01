@@ -7,9 +7,12 @@ echo "pwd: $PWD"
 cd swift-api-examples
 ls -lh
 
+./run-spoken-language-identification.sh
+rm -rf sherpa-onnx-whisper*
+
 mkdir -p /Users/fangjun/Desktop
 pushd /Users/fangjun/Desktop
-wget -q https://huggingface.co/csukuangfj/test-data/resolve/main/Obama.wav
+curl -SL -O https://huggingface.co/csukuangfj/test-data/resolve/main/Obama.wav
 ls -lh
 popd
 

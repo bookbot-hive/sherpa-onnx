@@ -68,6 +68,14 @@ jobs:
 
           ls -lh ./bin/Release/sherpa-onnx.exe
 
+      - name: Test spoken language identification
+        shell: bash
+        run: |
+          export PATH=$PWD/build/bin/Release:$PATH
+          export EXE=sherpa-onnx-offline-language-identification.exe
+
+          .github/scripts/test-spoken-language-identification.sh
+
       - name: Test online CTC
         shell: bash
         run: |
@@ -133,7 +141,6 @@ jobs:
           .github/scripts/test-online-transducer.sh
 
       - name: Copy files
-        if: github.repository_owner == 'csukuangfj' || github.repository_owner == 'k2-fsa' && github.event_name == 'push' && contains(github.ref, 'refs/tags/')
         shell: bash
         run: |
           SHERPA_ONNX_VERSION=v$(grep "SHERPA_ONNX_VERSION" ./CMakeLists.txt  | cut -d " " -f 2  | cut -d '"' -f 2)
@@ -148,7 +155,7 @@ jobs:
           tar cjvf ${dst}.tar.bz2 $dst
 
       - name: Release pre-compiled binaries and libs for Windows x64 CUDA
-        if: github.repository_owner == 'csukuangfj' || github.repository_owner == 'k2-fsa' && github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+        if: (github.repository_owner == 'csukuangfj' || github.repository_owner == 'k2-fsa') && github.event_name == 'push' && contains(github.ref, 'refs/tags/')
         uses: svenstaro/upload-release-action@v2
         with:
           file_glob: true

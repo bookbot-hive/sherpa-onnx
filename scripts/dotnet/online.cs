@@ -129,6 +129,8 @@ namespace SherpaOnnx
       Rule1MinTrailingSilence = 1.2F;
       Rule2MinTrailingSilence = 2.4F;
       Rule3MinUtteranceLength = 20.0F;
+      HotwordsFile = "";
+      HotwordsScore = 1.5F;
     }
     public FeatureConfig FeatConfig;
     public OnlineModelConfig ModelConfig;
@@ -158,6 +160,13 @@ namespace SherpaOnnx
     /// this value.
     /// Used only when enable_endpoint is not 0.
     public float Rule3MinUtteranceLength;
+
+    /// Path to the hotwords.
+    [MarshalAs(UnmanagedType.LPStr)]
+    public string HotwordsFile;
+
+    /// Bonus score for each token in hotwords.
+    public float HotwordsScore;
   }
 
   public class OnlineRecognizerResult
@@ -176,23 +185,82 @@ namespace SherpaOnnx
         while (*buffer != 0)
         {
           ++buffer;
+          length += 1;
         }
-        length = (int)(buffer - (byte*)impl.Text);
       }
 
       byte[] stringBuffer = new byte[length];
       Marshal.Copy(impl.Text, stringBuffer, 0, length);
       _text = Encoding.UTF8.GetString(stringBuffer);
+
+      _tokens = new String[impl.Count];
+
+      unsafe
+      {
+        byte* buf = (byte*)impl.Tokens;
+        for (int i = 0; i < impl.Count; i++)
+        {
+          length = 0;
+          byte* start = buf;
+          while (*buf != 0)
+          {
+            ++buf;
+            length += 1;
+          }
+          ++buf;
+
+          stringBuffer = new byte[length];
+          fixed (byte* pTarget = stringBuffer)
+          {
+            for (int k = 0; k < length; k++)
+            {
+              pTarget[k] = start[k];
+            }
+          }
+
+          _tokens[i] = Encoding.UTF8.GetString(stringBuffer);
+        }
+      }
+
+      unsafe
+      {
+        float* t = (float*)impl.Timestamps;
+        if (t != null)
+        {
+          _timestamps = new float[impl.Count];
+          fixed (float* pTarget = _timestamps)
+          {
+            for (int i = 0; i < impl.Count; i++)
+            {
+              pTarget[i] = t[i];
+            }
+          }
+        }
+        else
+        {
+          _timestamps = Array.Empty<float>();
+        }
+      }
     }
 
     [StructLayout(LayoutKind.Sequential)]
     struct Impl
     {
       public IntPtr Text;
+      public IntPtr Tokens;
+      public IntPtr TokensArr;
+      public IntPtr Timestamps;
+      public int Count;
     }
 
     private String _text;
     public String Text => _text;
+
+    private String[] _tokens;
+    public String[] Tokens => _tokens;
+
+    private float[] _timestamps;
+    public float[] Timestamps => _timestamps;
   }
 
   public class OnlineStream : IDisposable

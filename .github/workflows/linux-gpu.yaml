@@ -50,7 +50,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        build_type: [Release, Debug]
+        # build_type: [Release, Debug]
+        build_type: [Release]
 
     steps:
       - uses: actions/checkout@v4
@@ -91,6 +92,14 @@ jobs:
           file build/bin/sherpa-onnx
           readelf -d build/bin/sherpa-onnx
 
+      - name: Test spoken language identification
+        shell: bash
+        run: |
+          export PATH=$PWD/build/bin:$PATH
+          export EXE=sherpa-onnx-offline-language-identification
+
+          .github/scripts/test-spoken-language-identification.sh
+
       - name: Test online CTC
         shell: bash
         run: |
@@ -114,6 +123,7 @@ jobs:
           export EXE=sherpa-onnx
 
           .github/scripts/test-online-paraformer.sh
+
 
       - name: Test offline Whisper
         shell: bash
@@ -173,7 +183,7 @@ jobs:
           tar cjvf ${dst}.tar.bz2 $dst
 
       - name: Release pre-compiled binaries and libs for linux x64
-        if: github.repository_owner == 'csukuangfj' || github.repository_owner == 'k2-fsa' && github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+        if: (github.repository_owner == 'csukuangfj' || github.repository_owner == 'k2-fsa') && github.event_name == 'push' && contains(github.ref, 'refs/tags/')
         uses: svenstaro/upload-release-action@v2
         with:
           file_glob: true

@@ -40,6 +40,12 @@ class OfflineDecodeFiles
     [Option("whisper-decoder", Required = false, Default = "", HelpText = "Path to whisper decoder.onnx. Used only for whisper models")]
     public string WhisperDecoder { get; set; }
 
+    [Option("whisper-language", Required = false, Default = "", HelpText = "Language of the input file. Can be empty")]
+    public string WhisperLanguage{ get; set; }
+
+    [Option("whisper-task", Required = false, Default = "transcribe", HelpText = "transcribe or translate")]
+    public string WhisperTask{ get; set; }
+
     [Option("tdnn-model", Required = false, Default = "", HelpText = "Path to tdnn yesno model")]
     public string TdnnModel { get; set; }
 
@@ -61,6 +67,12 @@ class OfflineDecodeFiles
         HelpText = @"Used only when --decoding--method is modified_beam_search.
 It specifies number of active paths to keep during the search")]
     public int MaxActivePaths { get; set; }
+
+    [Option("hotwords-file", Required = false, Default = "", HelpText = "Path to hotwords.txt")]
+    public string HotwordsFile { get; set; }
+
+    [Option("hotwords-score", Required = false, Default = 1.5F, HelpText = "hotwords score")]
+    public float HotwordsScore { get; set; }
 
     [Option("files", Required = true, HelpText = "Audio files for decoding")]
     public IEnumerable<string> Files { get; set; }
@@ -193,6 +205,8 @@ to download pre-trained Tdnn models.
     {
       config.ModelConfig.Whisper.Encoder = options.WhisperEncoder;
       config.ModelConfig.Whisper.Decoder = options.WhisperDecoder;
+      config.ModelConfig.Whisper.Language = options.WhisperLanguage;
+      config.ModelConfig.Whisper.Task = options.WhisperTask;
     }
     else if (!String.IsNullOrEmpty(options.TdnnModel))
     {
@@ -206,6 +220,9 @@ to download pre-trained Tdnn models.
 
     config.DecodingMethod = options.DecodingMethod;
     config.MaxActivePaths = options.MaxActivePaths;
+    config.HotwordsFile = options.HotwordsFile;
+    config.HotwordsScore = options.HotwordsScore;
+
     config.ModelConfig.Debug = 0;
 
     OfflineRecognizer recognizer = new OfflineRecognizer(config);

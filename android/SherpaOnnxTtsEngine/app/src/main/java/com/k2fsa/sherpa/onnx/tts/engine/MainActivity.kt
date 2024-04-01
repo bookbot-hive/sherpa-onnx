@@ -72,9 +72,11 @@ class MainActivity : ComponentActivity() {
                                         modifier = Modifier.fillMaxWidth()
                                     )
                                 }
-                                var testText by remember { mutableStateOf("") }
 
+                                val testTextContent = getSampleText(TtsEngine.lang ?: "")
 
+                                var testText by remember { mutableStateOf(testTextContent) }
+                                
                                 val numSpeakers = TtsEngine.tts!!.numSpeakers()
                                 if (numSpeakers > 1) {
                                     OutlinedTextField(

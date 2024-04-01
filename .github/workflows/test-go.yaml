@@ -4,9 +4,23 @@ on:
   push:
     branches:
       - master
+    paths:
+      - '.github/workflows/test-go.yaml'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - 'sherpa-onnx/csrc/*'
+      - 'go-api-examples/**'
+      - 'scripts/go/**'
   pull_request:
     branches:
       - master
+    paths:
+      - '.github/workflows/test-go.yaml'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - 'sherpa-onnx/csrc/*'
+      - 'go-api-examples/**'
+      - 'scripts/go/**'
 
   workflow_dispatch:
 
@@ -59,6 +73,12 @@ jobs:
           cd ../scripts/go/_internal/
           go mod tidy
           go build
+
+      - name: Test speaker identification
+        shell: bash
+        run: |
+          cd scripts/go/_internal/speaker-identification/
+          ./run.sh
 
       - name: Test non-streaming TTS (macOS)
         shell: bash
