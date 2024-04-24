@@ -90,3 +90,9 @@ sherpa-onnx-paraformer-trilingual-zh-cantonese-en
 sr-data
 *xcworkspace/xcuserdata/*
 
+vits-icefall-*
+sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12
+spoken-language-identification-test-wavs
+my-release-key*
+vits-zh-hf-fanchen-C
+sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01

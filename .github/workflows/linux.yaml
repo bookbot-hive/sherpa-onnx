@@ -15,6 +15,8 @@ on:
       - '.github/scripts/test-offline-ctc.sh'
       - '.github/scripts/test-online-ctc.sh'
       - '.github/scripts/test-offline-tts.sh'
+      - '.github/scripts/test-audio-tagging.sh'
+      - '.github/scripts/test-offline-punctuation.sh'
       - 'CMakeLists.txt'
       - 'cmake/**'
       - 'sherpa-onnx/csrc/*'
@@ -32,6 +34,8 @@ on:
       - '.github/scripts/test-offline-ctc.sh'
       - '.github/scripts/test-online-ctc.sh'
       - '.github/scripts/test-offline-tts.sh'
+      - '.github/scripts/test-audio-tagging.sh'
+      - '.github/scripts/test-offline-punctuation.sh'
       - 'CMakeLists.txt'
       - 'cmake/**'
       - 'sherpa-onnx/csrc/*'
@@ -122,7 +126,15 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.build_type }}-with-shared-lib-${{ matrix.shared_lib }}-with-tts-${{ matrix.with_tts }}
-          path: build/bin/*
+          path: install/*
+
+      - name: Test offline punctuation
+        shell: bash
+        run: |
+          export PATH=$PWD/build/bin:$PATH
+          export EXE=sherpa-onnx-offline-punctuation
+
+          .github/scripts/test-offline-punctuation.sh
 
       - name: Test C API
         shell: bash
@@ -130,8 +142,27 @@ jobs:
           export PATH=$PWD/build/bin:$PATH
           export SLID_EXE=spoken-language-identification-c-api
           export SID_EXE=speaker-identification-c-api
+          export AT_EXE=audio-tagging-c-api
+          export PUNCT_EXE=add-punctuation-c-api
 
           .github/scripts/test-c-api.sh
+
+      - name: Test Audio tagging
+        shell: bash
+        run: |
+          export PATH=$PWD/build/bin:$PATH
+          export EXE=sherpa-onnx-offline-audio-tagging
+
+          .github/scripts/test-audio-tagging.sh
+
+      - name: Test online CTC
+        shell: bash
+        run: |
+          export PATH=$PWD/build/bin:$PATH
+          export EXE=sherpa-onnx
+
+          .github/scripts/test-online-ctc.sh
+
 
       - name: Test spoken language identification (C++ API)
         shell: bash
@@ -149,13 +180,6 @@ jobs:
 
           .github/scripts/test-kws.sh
 
-      - name: Test online CTC
-        shell: bash
-        run: |
-          export PATH=$PWD/build/bin:$PATH
-          export EXE=sherpa-onnx
-
-          .github/scripts/test-online-ctc.sh
 
       - name: Test offline Whisper
         if: matrix.build_type != 'Debug'

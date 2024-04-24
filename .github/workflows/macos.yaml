@@ -15,6 +15,8 @@ on:
       - '.github/scripts/test-offline-ctc.sh'
       - '.github/scripts/test-offline-tts.sh'
       - '.github/scripts/test-online-ctc.sh'
+      - '.github/scripts/test-audio-tagging.sh'
+      - '.github/scripts/test-offline-punctuation.sh'
       - 'CMakeLists.txt'
       - 'cmake/**'
       - 'sherpa-onnx/csrc/*'
@@ -31,6 +33,8 @@ on:
       - '.github/scripts/test-offline-ctc.sh'
       - '.github/scripts/test-offline-tts.sh'
       - '.github/scripts/test-online-ctc.sh'
+      - '.github/scripts/test-audio-tagging.sh'
+      - '.github/scripts/test-offline-punctuation.sh'
       - 'CMakeLists.txt'
       - 'cmake/**'
       - 'sherpa-onnx/csrc/*'
@@ -103,14 +107,32 @@ jobs:
           otool -L build/bin/sherpa-onnx
           otool -l build/bin/sherpa-onnx
 
+      - name: Test offline punctuation
+        shell: bash
+        run: |
+          export PATH=$PWD/build/bin:$PATH
+          export EXE=sherpa-onnx-offline-punctuation
+
+          .github/scripts/test-offline-punctuation.sh
+
       - name: Test C API
         shell: bash
         run: |
           export PATH=$PWD/build/bin:$PATH
           export SLID_EXE=spoken-language-identification-c-api
           export SID_EXE=speaker-identification-c-api
+          export AT_EXE=audio-tagging-c-api
+          export PUNCT_EXE=add-punctuation-c-api
 
           .github/scripts/test-c-api.sh
+
+      - name: Test Audio tagging
+        shell: bash
+        run: |
+          export PATH=$PWD/build/bin:$PATH
+          export EXE=sherpa-onnx-offline-audio-tagging
+
+          .github/scripts/test-audio-tagging.sh
 
       - name: Test spoken language identification (C++ API)
         shell: bash

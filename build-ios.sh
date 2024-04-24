@@ -8,11 +8,16 @@ cd $dir
 onnxruntime_version=1.17.1
 onnxruntime_dir=ios-onnxruntime/$onnxruntime_version
 
+SHERPA_ONNX_GITHUB=github.com
+
+if [ "$SHERPA_ONNX_GITHUB_MIRROW" == true ]; then
+    SHERPA_ONNX_GITHUB=hub.nuaa.cf
+fi
+
 if [ ! -f $onnxruntime_dir/onnxruntime.xcframework/ios-arm64/onnxruntime.a ]; then
   mkdir -p $onnxruntime_dir
   pushd $onnxruntime_dir
-  rm -f onnxruntime.xcframework-${onnxruntime_version}.tar.bz2
-  wget https://github.com/csukuangfj/onnxruntime-libs/releases/download/v${onnxruntime_version}/onnxruntime.xcframework-${onnxruntime_version}.tar.bz2
+  wget -c https://${SHERPA_ONNX_GITHUB}/csukuangfj/onnxruntime-libs/releases/download/v${onnxruntime_version}/onnxruntime.xcframework-${onnxruntime_version}.tar.bz2
   tar xvf onnxruntime.xcframework-${onnxruntime_version}.tar.bz2
   rm onnxruntime.xcframework-${onnxruntime_version}.tar.bz2
   cd ..
@@ -124,6 +129,7 @@ echo "Generate xcframework"
 
 mkdir -p "build/simulator/lib"
 for f in libkaldi-native-fbank-core.a libsherpa-onnx-c-api.a libsherpa-onnx-core.a \
+         libsherpa-onnx-fstfar.a \
          libsherpa-onnx-fst.a libsherpa-onnx-kaldifst-core.a libkaldi-decoder-core.a \
          libucd.a libpiper_phonemize.a libespeak-ng.a; do
   lipo -create build/simulator_arm64/lib/${f} \
@@ -137,6 +143,7 @@ libtool -static -o build/simulator/sherpa-onnx.a \
   build/simulator/lib/libkaldi-native-fbank-core.a \
   build/simulator/lib/libsherpa-onnx-c-api.a \
   build/simulator/lib/libsherpa-onnx-core.a  \
+  build/simulator/lib/libsherpa-onnx-fstfar.a   \
   build/simulator/lib/libsherpa-onnx-fst.a   \
   build/simulator/lib/libsherpa-onnx-kaldifst-core.a \
   build/simulator/lib/libkaldi-decoder-core.a \
@@ -148,6 +155,7 @@ libtool -static -o build/os64/sherpa-onnx.a \
   build/os64/lib/libkaldi-native-fbank-core.a \
   build/os64/lib/libsherpa-onnx-c-api.a \
   build/os64/lib/libsherpa-onnx-core.a \
+  build/os64/lib/libsherpa-onnx-fstfar.a   \
   build/os64/lib/libsherpa-onnx-fst.a   \
   build/os64/lib/libsherpa-onnx-kaldifst-core.a \
   build/os64/lib/libkaldi-decoder-core.a \

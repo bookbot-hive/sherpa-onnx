@@ -51,6 +51,10 @@ function createOnlineRecognizer() {
     rule3MinUtteranceLength: 20,
     hotwordsFile: '',
     hotwordsScore: 1.5,
+    ctcFstDecoderConfig: {
+      graph: '',
+      maxActive: 3000,
+    }
   };
 
   return sherpa_onnx.createOnlineRecognizer(recognizerConfig);
@@ -71,7 +75,7 @@ function decode(samples) {
   while (recognizer.isReady(stream)) {
     recognizer.decode(stream);
   }
-  const text = recognizer.getResult(stream);
+  const text = recognizer.getResult(stream).text;
   console.log(text);
 }
 

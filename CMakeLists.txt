@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13 FATAL_ERROR)
 project(sherpa-onnx)
 
-set(SHERPA_ONNX_VERSION "1.9.15")
+set(SHERPA_ONNX_VERSION "1.9.22")
 
 # Disable warning about
 #
@@ -260,6 +260,7 @@ if(SHERPA_ONNX_ENABLE_TTS)
   set(ESPEAK_NG_DIR ${espeak_ng_SOURCE_DIR})
   message(STATUS "ESPEAK_NG_DIR: ${ESPEAK_NG_DIR}")
   include(piper-phonemize)
+  include(cppjieba) # For Chinese TTS. It is a header-only C++ library
 endif()
 
 add_subdirectory(sherpa-onnx)

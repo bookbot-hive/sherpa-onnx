@@ -51,6 +51,8 @@ set(sources
   offline-zipformer-ctc-model-config.cc
   offline-zipformer-ctc-model.cc
   online-conformer-transducer-model.cc
+  online-ctc-fst-decoder-config.cc
+  online-ctc-fst-decoder.cc
   online-ctc-greedy-search-decoder.cc
   online-ctc-model.cc
   online-lm-config.cc
@@ -109,8 +111,28 @@ list(APPEND sources
   speaker-embedding-manager.cc
 )
 
+# audio tagging
+list(APPEND sources
+  audio-tagging-impl.cc
+  audio-tagging-label-file.cc
+  audio-tagging-model-config.cc
+  audio-tagging.cc
+  offline-ced-model.cc
+  offline-zipformer-audio-tagging-model-config.cc
+  offline-zipformer-audio-tagging-model.cc
+)
+
+# punctuation
+list(APPEND sources
+  offline-ct-transformer-model.cc
+  offline-punctuation-impl.cc
+  offline-punctuation-model-config.cc
+  offline-punctuation.cc
+)
+
 if(SHERPA_ONNX_ENABLE_TTS)
   list(APPEND sources
+    jieba-lexicon.cc
     lexicon.cc
     offline-tts-character-frontend.cc
     offline-tts-impl.cc
@@ -162,6 +184,8 @@ endif()
 
 if(SHERPA_ONNX_ENABLE_TTS)
   target_link_libraries(sherpa-onnx-core piper_phonemize)
+  target_link_libraries(sherpa-onnx-core fstfar fst)
+  target_link_libraries(sherpa-onnx-core cppjieba)
 endif()
 
 if(SHERPA_ONNX_ENABLE_CHECK)
@@ -188,8 +212,10 @@ if(SHERPA_ONNX_ENABLE_BINARY)
   add_executable(sherpa-onnx sherpa-onnx.cc)
   add_executable(sherpa-onnx-keyword-spotter sherpa-onnx-keyword-spotter.cc)
   add_executable(sherpa-onnx-offline sherpa-onnx-offline.cc)
-  add_executable(sherpa-onnx-offline-parallel sherpa-onnx-offline-parallel.cc)
+  add_executable(sherpa-onnx-offline-audio-tagging sherpa-onnx-offline-audio-tagging.cc)
   add_executable(sherpa-onnx-offline-language-identification sherpa-onnx-offline-language-identification.cc)
+  add_executable(sherpa-onnx-offline-parallel sherpa-onnx-offline-parallel.cc)
+  add_executable(sherpa-onnx-offline-punctuation sherpa-onnx-offline-punctuation.cc)
 
   if(SHERPA_ONNX_ENABLE_TTS)
     add_executable(sherpa-onnx-offline-tts sherpa-onnx-offline-tts.cc)
@@ -199,8 +225,10 @@ if(SHERPA_ONNX_ENABLE_BINARY)
     sherpa-onnx
     sherpa-onnx-keyword-spotter
     sherpa-onnx-offline
-    sherpa-onnx-offline-parallel
+    sherpa-onnx-offline-audio-tagging
     sherpa-onnx-offline-language-identification
+    sherpa-onnx-offline-parallel
+    sherpa-onnx-offline-punctuation
   )
   if(SHERPA_ONNX_ENABLE_TTS)
     list(APPEND main_exes
@@ -245,9 +273,11 @@ endif()
 
 if(SHERPA_ONNX_HAS_ALSA AND SHERPA_ONNX_ENABLE_BINARY)
   add_executable(sherpa-onnx-alsa sherpa-onnx-alsa.cc alsa.cc)
-  add_executable(sherpa-onnx-keyword-spotter-alsa sherpa-onnx-keyword-spotter-alsa.cc alsa.cc)
   add_executable(sherpa-onnx-alsa-offline sherpa-onnx-alsa-offline.cc alsa.cc)
+  add_executable(sherpa-onnx-alsa-offline-audio-tagging sherpa-onnx-alsa-offline-audio-tagging.cc alsa.cc)
   add_executable(sherpa-onnx-alsa-offline-speaker-identification sherpa-onnx-alsa-offline-speaker-identification.cc alsa.cc)
+  add_executable(sherpa-onnx-keyword-spotter-alsa sherpa-onnx-keyword-spotter-alsa.cc alsa.cc)
+  add_executable(sherpa-onnx-vad-alsa sherpa-onnx-vad-alsa.cc alsa.cc)
 
 
   if(SHERPA_ONNX_ENABLE_TTS)
@@ -256,9 +286,11 @@ if(SHERPA_ONNX_HAS_ALSA AND SHERPA_ONNX_ENABLE_BINARY)
 
   set(exes
     sherpa-onnx-alsa
-    sherpa-onnx-keyword-spotter-alsa
     sherpa-onnx-alsa-offline
     sherpa-onnx-alsa-offline-speaker-identification
+    sherpa-onnx-keyword-spotter-alsa
+    sherpa-onnx-vad-alsa
+    sherpa-onnx-alsa-offline-audio-tagging
   )
 
   if(SHERPA_ONNX_ENABLE_TTS)
@@ -337,6 +369,11 @@ if(SHERPA_ONNX_ENABLE_PORTAUDIO AND SHERPA_ONNX_ENABLE_BINARY)
     microphone.cc
   )
 
+  add_executable(sherpa-onnx-microphone-offline-audio-tagging
+    sherpa-onnx-microphone-offline-audio-tagging.cc
+    microphone.cc
+  )
+
   if(BUILD_SHARED_LIBS)
     set(PA_LIB portaudio)
   else()
@@ -348,6 +385,7 @@ if(SHERPA_ONNX_ENABLE_PORTAUDIO AND SHERPA_ONNX_ENABLE_BINARY)
     sherpa-onnx-keyword-spotter-microphone
     sherpa-onnx-microphone-offline
     sherpa-onnx-microphone-offline-speaker-identification
+    sherpa-onnx-microphone-offline-audio-tagging
     sherpa-onnx-vad-microphone
     sherpa-onnx-vad-microphone-offline-asr
   )
@@ -455,6 +493,7 @@ if(SHERPA_ONNX_ENABLE_TESTS)
   )
   if(SHERPA_ONNX_ENABLE_TTS)
     list(APPEND sherpa_onnx_test_srcs
+      cppjieba-test.cc
       piper-phonemize-test.cc
     )
   endif()

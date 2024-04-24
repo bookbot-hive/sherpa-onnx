@@ -19,12 +19,16 @@ void OnlineWebsocketDecoderConfig::Register(ParseOptions *po) {
 
   po->Register("max-batch-size", &max_batch_size,
                "Max batch size for recognition.");
+
+  po->Register("end-tail-padding", &end_tail_padding,
+               "It determines the length of tail_padding at the end of audio.");
 }
 
 void OnlineWebsocketDecoderConfig::Validate() const {
   recognizer_config.Validate();
   SHERPA_ONNX_CHECK_GT(loop_interval_ms, 0);
   SHERPA_ONNX_CHECK_GT(max_batch_size, 0);
+  SHERPA_ONNX_CHECK_GT(end_tail_padding, 0);
 }
 
 void OnlineWebsocketServerConfig::Register(sherpa_onnx::ParseOptions *po) {
@@ -82,13 +86,18 @@ void OnlineWebsocketDecoder::InputFinished(std::shared_ptr<Connection> c) {
     c->samples.pop_front();
   }
 
-  // TODO(fangjun): Change the amount of paddings to be configurable
-  std::vector<float> tail_padding(static_cast<int64_t>(0.8 * sample_rate));
+  std::vector<float> tail_padding(
+      static_cast<int64_t>(config_.end_tail_padding * sample_rate));
 
   c->s->AcceptWaveform(sample_rate, tail_padding.data(), tail_padding.size());
 
   c->s->InputFinished();
   c->eof = true;
+}
+
+void OnlineWebsocketDecoder::Warmup() const {
+  recognizer_->WarmpUpRecognizer(config_.recognizer_config.model_config.warm_up,
+                                 config_.max_batch_size);
 }
 
 void OnlineWebsocketDecoder::Run() {
@@ -238,6 +247,24 @@ void OnlineWebsocketServer::Run(uint16_t port) {
   server_.set_reuse_addr(true);
   server_.listen(asio::ip::tcp::v4(), port);
   server_.start_accept();
+  auto recognizer_config = config_.decoder_config.recognizer_config;
+  int32_t warm_up = recognizer_config.model_config.warm_up;
+  const std::string &model_type = recognizer_config.model_config.model_type;
+  if (0 < warm_up && warm_up < 100) {
+    if (model_type == "zipformer2") {
+      decoder_.Warmup();
+      SHERPA_ONNX_LOGE("Warm up completed : %d times.", warm_up);
+    } else {
+      SHERPA_ONNX_LOGE("Only Zipformer2 has warmup support for now.");
+      SHERPA_ONNX_LOGE("Given: %s", model_type.c_str());
+      exit(0);
+    }
+  } else if (warm_up == 0) {
+    SHERPA_ONNX_LOGE("Starting without warmup!");
+  } else {
+    SHERPA_ONNX_LOGE("Invalid Warm up Value!. Expected 0 < warm_up < 100");
+    exit(0);
+  }
   decoder_.Run();
 }
 

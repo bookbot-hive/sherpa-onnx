@@ -52,7 +52,7 @@ card 3: UACDemoV10 [UACDemoV1.0], device 0: USB Audio [USB Audio]
   Subdevices: 1/1
   Subdevice #0: subdevice #0
 
-and if you want to select card 3 and the device 0 on that card, please use:
+and if you want to select card 3 and device 0 on that card, please use:
 
   plughw:3,0
 
@@ -112,6 +112,20 @@ as the device_name.
     auto text = recognizer.GetResult(stream.get()).text;
 
     bool is_endpoint = recognizer.IsEndpoint(stream.get());
+
+    if (is_endpoint && !config.model_config.paraformer.encoder.empty()) {
+      // For streaming paraformer models, since it has a large right chunk size
+      // we need to pad it on endpointing so that the last character
+      // can be recognized
+      std::vector<float> tail_paddings(
+          static_cast<int>(1.0 * expected_sample_rate));
+      stream->AcceptWaveform(expected_sample_rate, tail_paddings.data(),
+                             tail_paddings.size());
+      while (recognizer.IsReady(stream.get())) {
+        recognizer.DecodeStream(stream.get());
+      }
+      text = recognizer.GetResult(stream.get()).text;
+    }
 
     if (!text.empty() && last_text != text) {
       last_text = text;

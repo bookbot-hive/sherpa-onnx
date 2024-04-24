@@ -21,6 +21,10 @@ void OnlineModelConfig::Register(ParseOptions *po) {
   po->Register("num-threads", &num_threads,
                "Number of threads to run the neural network");
 
+  po->Register("warm-up", &warm_up,
+               "Number of warm-up to run the onnxruntime"
+               "Valid vales are: zipformer2");
+
   po->Register("debug", &debug,
                "true to print model information while loading it.");
 
@@ -41,7 +45,7 @@ bool OnlineModelConfig::Validate() const {
   }
 
   if (!FileExists(tokens)) {
-    SHERPA_ONNX_LOGE("tokens: %s does not exist", tokens.c_str());
+    SHERPA_ONNX_LOGE("tokens: '%s' does not exist", tokens.c_str());
     return false;
   }
 
@@ -70,6 +74,7 @@ std::string OnlineModelConfig::ToString() const {
   os << "zipformer2_ctc=" << zipformer2_ctc.ToString() << ", ";
   os << "tokens=\"" << tokens << "\", ";
   os << "num_threads=" << num_threads << ", ";
+  os << "warm_up=" << warm_up << ", ";
   os << "debug=" << (debug ? "True" : "False") << ", ";
   os << "provider=\"" << provider << "\", ";
   os << "model_type=\"" << model_type << "\")";

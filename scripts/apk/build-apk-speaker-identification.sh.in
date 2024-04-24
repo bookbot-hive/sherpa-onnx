@@ -29,6 +29,8 @@ log "====================x86-64===================="
 log "====================x86===================="
 ./build-android-x86.sh
 
+export SHERPA_ONNX_ENABLE_TTS=OFF
+
 mkdir -p apks
 
 {% for model in model_list %}
@@ -51,7 +53,7 @@ popd
 
 for arch in arm64-v8a armeabi-v7a x86_64 x86; do
   log "------------------------------------------------------------"
-  log "build tts apk for $arch"
+  log "build speaker identification apk for $arch"
   log "------------------------------------------------------------"
   src_arch=$arch
   if [ $arch == "armeabi-v7a" ]; then

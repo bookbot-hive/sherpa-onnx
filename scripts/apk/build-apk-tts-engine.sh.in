@@ -29,6 +29,8 @@ log "====================x86-64===================="
 log "====================x86===================="
 ./build-android-x86.sh
 
+export SHERPA_ONNX_ENABLE_TTS=ON
+
 mkdir -p apks
 
 {% for tts_model in tts_model_list %}
@@ -54,6 +56,16 @@ sed -i.bak s/"lang = null"/"lang = \"$lang_iso_639_3\""/ ./TtsEngine.kt
 {% if tts_model.rule_fsts %}
   rule_fsts={{ tts_model.rule_fsts }}
   sed -i.bak s%"ruleFsts = null"%"ruleFsts = \"$rule_fsts\""% ./TtsEngine.kt
+{% endif %}
+
+{% if tts_model.rule_fars %}
+  rule_fars={{ tts_model.rule_fars }}
+  sed -i.bak s%"ruleFsts = null"%"ruleFars = \"$rule_fars\""% ./TtsEngine.kt
+{% endif %}
+
+{% if tts_model.dict_dir %}
+  dict_dir={{ tts_model.dict_dir }}
+  sed -i.bak s%"dictDir = null"%"dictDir = \"$dict_dir\""% ./TtsEngine.kt
 {% endif %}
 
 {% if tts_model.data_dir %}

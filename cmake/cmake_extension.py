@@ -49,9 +49,12 @@ def get_binaries():
         "sherpa-onnx-keyword-spotter",
         "sherpa-onnx-microphone",
         "sherpa-onnx-microphone-offline",
+        "sherpa-onnx-microphone-offline-audio-tagging",
         "sherpa-onnx-microphone-offline-speaker-identification",
         "sherpa-onnx-offline",
+        "sherpa-onnx-offline-audio-tagging",
         "sherpa-onnx-offline-language-identification",
+        "sherpa-onnx-offline-punctuation",
         "sherpa-onnx-offline-tts",
         "sherpa-onnx-offline-tts-play",
         "sherpa-onnx-offline-websocket-server",
@@ -67,6 +70,8 @@ def get_binaries():
             "sherpa-onnx-alsa-offline",
             "sherpa-onnx-alsa-offline-speaker-identification",
             "sherpa-onnx-offline-tts-play-alsa",
+            "sherpa-onnx-vad-alsa",
+            "sherpa-onnx-alsa-offline-audio-tagging",
         ]
 
     if is_windows():
@@ -78,6 +83,7 @@ def get_binaries():
             "piper_phonemize.dll",
             "sherpa-onnx-c-api.dll",
             "sherpa-onnx-core.dll",
+            "sherpa-onnx-fstfar.lib",
             "sherpa-onnx-fst.lib",
             "sherpa-onnx-kaldifst-core.lib",
             "sherpa-onnx-portaudio.dll",
@@ -174,13 +180,20 @@ class BuildExtension(build_ext):
                 print('Setting make_args to "-j4"')
                 make_args = "-j4"
 
-            build_cmd = f"""
-                cd {self.build_temp}
+            if "-G Ninja" in cmake_args:
+                build_cmd = f"""
+                    cd {self.build_temp}
+                    cmake {cmake_args} {sherpa_onnx_dir}
+                    ninja {make_args} install
+                """
+            else:
+                build_cmd = f"""
+                    cd {self.build_temp}
 
-                cmake {cmake_args} {sherpa_onnx_dir}
+                    cmake {cmake_args} {sherpa_onnx_dir}
 
-                make {make_args} install/strip
-            """
+                    make {make_args} install/strip
+                """
             print(f"build command is:\n{build_cmd}")
 
             ret = os.system(build_cmd)

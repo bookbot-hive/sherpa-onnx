@@ -18,7 +18,7 @@ jobs:
   apk_speaker_identification:
     if: github.repository_owner == 'csukuangfj' || github.repository_owner == 'k2-fsa'
     runs-on: ${{ matrix.os }}
-    name: apk for tts ${{ matrix.index }}/${{ matrix.total }}
+    name: apk for speaker identification ${{ matrix.index }}/${{ matrix.total }}
     strategy:
       fail-fast: false
       matrix:

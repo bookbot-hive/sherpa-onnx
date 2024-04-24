@@ -15,7 +15,11 @@
 #include "android/asset_manager.h"
 #include "android/asset_manager_jni.h"
 #endif
+
+#include "fst/extensions/far/far.h"
+#include "kaldifst/csrc/kaldi-fst-io.h"
 #include "kaldifst/csrc/text-normalizer.h"
+#include "sherpa-onnx/csrc/jieba-lexicon.h"
 #include "sherpa-onnx/csrc/lexicon.h"
 #include "sherpa-onnx/csrc/macros.h"
 #include "sherpa-onnx/csrc/offline-tts-character-frontend.h"
@@ -46,6 +50,35 @@ class OfflineTtsVitsImpl : public OfflineTtsImpl {
         tn_list_.push_back(std::make_unique<kaldifst::TextNormalizer>(f));
       }
     }
+
+    if (!config.rule_fars.empty()) {
+      if (config.model.debug) {
+        SHERPA_ONNX_LOGE("Loading FST archives");
+      }
+      std::vector<std::string> files;
+      SplitStringToVector(config.rule_fars, ",", false, &files);
+
+      tn_list_.reserve(files.size() + tn_list_.size());
+
+      for (const auto &f : files) {
+        if (config.model.debug) {
+          SHERPA_ONNX_LOGE("rule far: %s", f.c_str());
+        }
+        std::unique_ptr<fst::FarReader<fst::StdArc>> reader(
+            fst::FarReader<fst::StdArc>::Open(f));
+        for (; !reader->Done(); reader->Next()) {
+          std::unique_ptr<fst::StdConstFst> r(
+              fst::CastOrConvertToConstFst(reader->GetFst()->Copy()));
+
+          tn_list_.push_back(
+              std::make_unique<kaldifst::TextNormalizer>(std::move(r)));
+        }
+      }
+
+      if (config.model.debug) {
+        SHERPA_ONNX_LOGE("FST archives loaded!");
+      }
+    }
   }
 
 #if __ANDROID_API__ >= 9
@@ -67,6 +100,34 @@ class OfflineTtsVitsImpl : public OfflineTtsImpl {
         tn_list_.push_back(std::make_unique<kaldifst::TextNormalizer>(is));
       }
     }
+
+    if (!config.rule_fars.empty()) {
+      std::vector<std::string> files;
+      SplitStringToVector(config.rule_fars, ",", false, &files);
+      tn_list_.reserve(files.size() + tn_list_.size());
+
+      for (const auto &f : files) {
+        if (config.model.debug) {
+          SHERPA_ONNX_LOGE("rule far: %s", f.c_str());
+        }
+
+        auto buf = ReadFile(mgr, f);
+
+        std::unique_ptr<std::istream> s(
+            new std::istrstream(buf.data(), buf.size()));
+
+        std::unique_ptr<fst::FarReader<fst::StdArc>> reader(
+            fst::FarReader<fst::StdArc>::Open(std::move(s)));
+
+        for (; !reader->Done(); reader->Next()) {
+          std::unique_ptr<fst::StdConstFst> r(
+              fst::CastOrConvertToConstFst(reader->GetFst()->Copy()));
+
+          tn_list_.push_back(
+              std::make_unique<kaldifst::TextNormalizer>(std::move(r)));
+        }  // for (; !reader->Done(); reader->Next())
+      }    // for (const auto &f : files)
+    }      // if (!config.rule_fars.empty())
   }
 #endif
 
@@ -230,9 +291,26 @@ class OfflineTtsVitsImpl : public OfflineTtsImpl {
   void InitFrontend() {
     const auto &meta_data = model_->GetMetaData();
 
+    if (meta_data.jieba && config_.model.vits.dict_dir.empty()) {
+      SHERPA_ONNX_LOGE(
+          "Please provide --vits-dict-dir for Chinese TTS models using jieba");
+      exit(-1);
+    }
+
+    if (!meta_data.jieba && !config_.model.vits.dict_dir.empty()) {
+      SHERPA_ONNX_LOGE(
+          "Current model is not using jieba but you provided --vits-dict-dir");
+      exit(-1);
+    }
+
     if (meta_data.frontend == "characters") {
       frontend_ = std::make_unique<OfflineTtsCharacterFrontend>(
           config_.model.vits.tokens, meta_data);
+    } else if (meta_data.jieba && !config_.model.vits.dict_dir.empty()) {
+      frontend_ = std::make_unique<JiebaLexicon>(
+          config_.model.vits.lexicon, config_.model.vits.tokens,
+          config_.model.vits.dict_dir, model_->GetMetaData(),
+          config_.model.debug);
     } else if ((meta_data.is_piper || meta_data.is_coqui ||
                 meta_data.is_icefall) &&
                !config_.model.vits.data_dir.empty()) {

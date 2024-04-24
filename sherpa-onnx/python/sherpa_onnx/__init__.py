@@ -1,12 +1,20 @@
 from _sherpa_onnx import (
     Alsa,
+    AudioEvent,
+    AudioTagging,
+    AudioTaggingConfig,
+    AudioTaggingModelConfig,
     CircularBuffer,
     Display,
+    OfflinePunctuation,
+    OfflinePunctuationConfig,
+    OfflinePunctuationModelConfig,
     OfflineStream,
     OfflineTts,
     OfflineTtsConfig,
     OfflineTtsModelConfig,
     OfflineTtsVitsModelConfig,
+    OfflineZipformerAudioTaggingModelConfig,
     OnlineStream,
     SileroVadModelConfig,
     SpeakerEmbeddingExtractor,
@@ -19,6 +27,7 @@ from _sherpa_onnx import (
     VadModel,
     VadModelConfig,
     VoiceActivityDetector,
+    write_wave,
 )
 
 from .keyword_spotter import KeywordSpotter

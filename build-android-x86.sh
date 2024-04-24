@@ -48,7 +48,7 @@ onnxruntime_version=1.17.1
 if [ ! -f $onnxruntime_version/jni/x86/libonnxruntime.so ]; then
   mkdir -p $onnxruntime_version
   pushd $onnxruntime_version
-  wget -q https://github.com/csukuangfj/onnxruntime-libs/releases/download/v${onnxruntime_version}/onnxruntime-android-${onnxruntime_version}.zip
+  wget -c -q https://github.com/csukuangfj/onnxruntime-libs/releases/download/v${onnxruntime_version}/onnxruntime-android-${onnxruntime_version}.zip
   unzip onnxruntime-android-${onnxruntime_version}.zip
   rm onnxruntime-android-${onnxruntime_version}.zip
   popd
@@ -60,7 +60,17 @@ export SHERPA_ONNXRUNTIME_INCLUDE_DIR=$dir/$onnxruntime_version/headers/
 echo "SHERPA_ONNXRUNTIME_LIB_DIR: $SHERPA_ONNXRUNTIME_LIB_DIR"
 echo "SHERPA_ONNXRUNTIME_INCLUDE_DIR $SHERPA_ONNXRUNTIME_INCLUDE_DIR"
 
+if [ -z $SHERPA_ONNX_ENABLE_TTS ]; then
+  SHERPA_ONNX_ENABLE_TTS=ON
+fi
+
+if [ -z $SHERPA_ONNX_ENABLE_BINARY ]; then
+  SHERPA_ONNX_ENABLE_BINARY=OFF
+fi
+
 cmake -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK/build/cmake/android.toolchain.cmake" \
+    -DSHERPA_ONNX_ENABLE_TTS=$SHERPA_ONNX_ENABLE_TTS \
+    -DSHERPA_ONNX_ENABLE_BINARY=$SHERPA_ONNX_ENABLE_BINARY \
     -DBUILD_PIPER_PHONMIZE_EXE=OFF \
     -DBUILD_PIPER_PHONMIZE_TESTS=OFF \
     -DBUILD_ESPEAK_NG_EXE=OFF \

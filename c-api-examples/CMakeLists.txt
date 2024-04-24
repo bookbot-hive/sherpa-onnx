@@ -15,6 +15,15 @@ target_link_libraries(spoken-language-identification-c-api sherpa-onnx-c-api)
 add_executable(speaker-identification-c-api speaker-identification-c-api.c)
 target_link_libraries(speaker-identification-c-api sherpa-onnx-c-api)
 
+add_executable(streaming-hlg-decode-file-c-api streaming-hlg-decode-file-c-api.c)
+target_link_libraries(streaming-hlg-decode-file-c-api sherpa-onnx-c-api)
+
+add_executable(audio-tagging-c-api audio-tagging-c-api.c)
+target_link_libraries(audio-tagging-c-api sherpa-onnx-c-api)
+
+add_executable(add-punctuation-c-api add-punctuation-c-api.c)
+target_link_libraries(add-punctuation-c-api sherpa-onnx-c-api)
+
 if(SHERPA_ONNX_HAS_ALSA)
   add_subdirectory(./asr-microphone-example)
 elseif((UNIX AND NOT APPLE) OR LINUX)

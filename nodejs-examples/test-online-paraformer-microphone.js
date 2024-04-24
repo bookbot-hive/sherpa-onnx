@@ -50,6 +50,10 @@ function createOnlineRecognizer() {
     rule3MinUtteranceLength: 20,
     hotwordsFile: '',
     hotwordsScore: 1.5,
+    ctcFstDecoderConfig: {
+      graph: '',
+      maxActive: 3000,
+    }
   };
 
   return sherpa_onnx.createOnlineRecognizer(recognizerConfig);
@@ -82,7 +86,7 @@ ai.on('data', data => {
   }
 
   const isEndpoint = recognizer.isEndpoint(stream);
-  const text = recognizer.getResult(stream);
+  const text = recognizer.getResult(stream).text;
 
   if (text.length > 0 && lastText != text) {
     lastText = text;

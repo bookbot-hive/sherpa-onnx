@@ -62,6 +62,8 @@ struct OnlineWebsocketDecoderConfig {
 
   int32_t max_batch_size = 5;
 
+  float end_tail_padding = 0.8;
+
   void Register(ParseOptions *po);
   void Validate() const;
 };
@@ -82,6 +84,8 @@ class OnlineWebsocketDecoder {
 
   // signal that there will be no more audio samples for a stream
   void InputFinished(std::shared_ptr<Connection> c);
+
+  void Warmup() const;
 
   void Run();
 

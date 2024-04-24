@@ -1,12 +1,50 @@
 #!/usr/bin/env bash
 
-set -e
+set -ex
 
 log() {
   # This function is from espnet
   local fname=${BASH_SOURCE[1]##*/}
   echo -e "$(date '+%Y-%m-%d %H:%M:%S') (${fname}:${BASH_LINENO[0]}:${FUNCNAME[1]}) $*"
 }
+
+log "test offline punctuation"
+
+curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/punctuation-models/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12.tar.bz2
+tar xvf sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12.tar.bz2
+rm sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12.tar.bz2
+repo=sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12
+ls -lh $repo
+
+python3 ./python-api-examples/add-punctuation.py
+
+rm -rf $repo
+
+log "test audio tagging"
+
+curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/audio-tagging-models/sherpa-onnx-zipformer-audio-tagging-2024-04-09.tar.bz2
+tar xvf sherpa-onnx-zipformer-audio-tagging-2024-04-09.tar.bz2
+rm sherpa-onnx-zipformer-audio-tagging-2024-04-09.tar.bz2
+ python3 ./python-api-examples/audio-tagging-from-a-file.py
+rm -rf sherpa-onnx-zipformer-audio-tagging-2024-04-09
+
+
+log "test streaming zipformer2 ctc HLG decoding"
+
+curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18.tar.bz2
+tar xvf sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18.tar.bz2
+rm sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18.tar.bz2
+repo=sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18
+
+python3 ./python-api-examples/online-zipformer-ctc-hlg-decode-file.py \
+  --debug 1 \
+  --tokens ./sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18/tokens.txt \
+  --graph ./sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18/HLG.fst \
+  --model ./sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18/ctc-epoch-30-avg-3-chunk-16-left-128.int8.onnx \
+  ./sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18/test_wavs/0.wav
+
+rm -rf sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18
+
 
 mkdir -p /tmp/icefall-models
 dir=/tmp/icefall-models

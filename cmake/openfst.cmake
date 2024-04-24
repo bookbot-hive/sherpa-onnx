@@ -3,18 +3,18 @@
 function(download_openfst)
   include(FetchContent)
 
-  set(openfst_URL  "https://github.com/kkm000/openfst/archive/refs/tags/win/1.6.5.1.tar.gz")
-  set(openfst_URL2  "https://huggingface.co/csukuangfj/kaldi-hmm-gmm-cmake-deps/resolve/main/openfst-win-1.6.5.1.tar.gz")
-  set(openfst_HASH "SHA256=02c49b559c3976a536876063369efc0e41ab374be1035918036474343877046e")
+  set(openfst_URL  "https://github.com/csukuangfj/openfst/archive/refs/tags/sherpa-onnx-2024-04-09.tar.gz")
+  set(openfst_URL2 "https://hub.nuaa.cf/csukuangfj/openfst/archive/refs/tags/sherpa-onnx-2024-04-09.tar.gz")
+  set(openfst_HASH "SHA256=d6bdb1700fa38938807184c69a5abe133e730af80822bb85c8f228768a969b92")
 
   # If you don't have access to the Internet,
   # please pre-download it
   set(possible_file_locations
-    $ENV{HOME}/Downloads/openfst-win-1.6.5.1.tar.gz
-    ${CMAKE_SOURCE_DIR}/openfst-win-1.6.5.1.tar.gz
-    ${CMAKE_BINARY_DIR}/openfst-win-1.6.5.1.tar.gz
-    /tmp/openfst-win-1.6.5.1.tar.gz
-    /star-fj/fangjun/download/github/openfst-win-1.6.5.1.tar.gz
+    $ENV{HOME}/Downloads/openfst-sherpa-onnx-2024-04-09.tar.gz
+    ${CMAKE_SOURCE_DIR}/openfst-sherpa-onnx-2024-04-09.tar.gz
+    ${CMAKE_BINARY_DIR}/openfst-sherpa-onnx-2024-04-09.tar.gz
+    /tmp/openfst-sherpa-onnx-2024-04-09.tar.gz
+    /star-fj/fangjun/download/github/openfst-sherpa-onnx-2024-04-09.tar.gz
   )
 
   foreach(f IN LISTS possible_file_locations)
@@ -31,7 +31,7 @@ function(download_openfst)
   set(HAVE_COMPACT OFF CACHE BOOL "" FORCE)
   set(HAVE_COMPRESS OFF CACHE BOOL "" FORCE)
   set(HAVE_CONST OFF CACHE BOOL "" FORCE)
-  set(HAVE_FAR OFF CACHE BOOL "" FORCE)
+  set(HAVE_FAR ON CACHE BOOL "" FORCE)
   set(HAVE_GRM OFF CACHE BOOL "" FORCE)
   set(HAVE_PDT OFF CACHE BOOL "" FORCE)
   set(HAVE_MPDT OFF CACHE BOOL "" FORCE)
@@ -70,20 +70,25 @@ function(download_openfst)
   add_subdirectory(${openfst_SOURCE_DIR} ${openfst_BINARY_DIR} EXCLUDE_FROM_ALL)
   set(openfst_SOURCE_DIR ${openfst_SOURCE_DIR} PARENT_SCOPE)
 
-  # Rename libfst.so.6 to libkaldifst_fst.so.6 to avoid potential conflicts
-  # when kaldifst is installed.
-  set_target_properties(fst PROPERTIES OUTPUT_NAME "kaldifst_fst")
+  # Rename libfst.so.6 to libsherpa-onnx-fst.so.6 to avoid potential conflicts
+  # when sherpa-onnx is installed.
+  set_target_properties(fst PROPERTIES OUTPUT_NAME "sherpa-onnx-fst")
+  set_target_properties(fstfar PROPERTIES OUTPUT_NAME "sherpa-onnx-fstfar")
 
-  install(TARGETS fst
-    DESTINATION lib
+  if(LINUX)
+    target_compile_options(fst PUBLIC -Wno-missing-template-keyword)
+  endif()
+
+  target_include_directories(fst
+    PUBLIC
+      ${openfst_SOURCE_DIR}/src/include
   )
 
-  if(KALDIFST_BUILD_PYTHON)
-    set_target_properties(fstscript PROPERTIES OUTPUT_NAME "kaldifst_fstscript")
-    install(TARGETS fstscript
-      DESTINATION lib
-    )
-  endif()
+  target_include_directories(fstfar
+    PUBLIC
+      ${openfst_SOURCE_DIR}/src/include
+  )
+  # installed in ./kaldi-decoder.cmake
 endfunction()
 
 download_openfst()

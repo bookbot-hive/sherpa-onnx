@@ -1,6 +1,7 @@
 include_directories(${CMAKE_SOURCE_DIR})
 
 set(srcs
+  audio-tagging.cc
   circular-buffer.cc
   display.cc
   endpoint.cc
@@ -11,6 +12,7 @@ set(srcs
   offline-model-config.cc
   offline-nemo-enc-dec-ctc-model-config.cc
   offline-paraformer-model-config.cc
+  offline-punctuation.cc
   offline-recognizer.cc
   offline-stream.cc
   offline-tdnn-model-config.cc
@@ -18,6 +20,7 @@ set(srcs
   offline-wenet-ctc-model-config.cc
   offline-whisper-model-config.cc
   offline-zipformer-ctc-model-config.cc
+  online-ctc-fst-decoder-config.cc
   online-lm-config.cc
   online-model-config.cc
   online-paraformer-model-config.cc
@@ -34,6 +37,7 @@ set(srcs
   vad-model-config.cc
   vad-model.cc
   voice-activity-detector.cc
+  wave-writer.cc
 )
 if(SHERPA_ONNX_HAS_ALSA)
   list(APPEND srcs ${CMAKE_SOURCE_DIR}/sherpa-onnx/csrc/alsa.cc alsa.cc)
