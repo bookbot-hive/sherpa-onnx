@@ -229,7 +229,7 @@ def main():
 
     config = sherpa_onnx.VadModelConfig()
     config.silero_vad.model = args.silero_vad_model
-    config.silero_vad.threshold = 0.2
+    config.silero_vad.threshold = 0.3
     config.silero_vad.min_silence_duration = 0.25
     config.silero_vad.min_speech_duration = 0.15
     config.silero_vad.window_size = 400
@@ -239,7 +239,7 @@ def main():
 
     vad = sherpa_onnx.VoiceActivityDetector(config, buffer_size_in_seconds=100)
 
-    samples_per_read = int(0.2 * args.sample_rate)  # 0.1 second = 100 ms
+    samples_per_read = int(0.1 * args.sample_rate)  # 0.1 second = 100 ms
     stream = recognizer.create_stream()
 
     print("Started! Please speak")
