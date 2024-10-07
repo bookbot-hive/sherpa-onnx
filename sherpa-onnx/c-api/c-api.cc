@@ -465,6 +465,8 @@ sherpa_onnx::OfflineRecognizerConfig convertConfig(
   recognizer_config.hotwords_file = SHERPA_ONNX_OR(config->hotwords_file, "");
   recognizer_config.hotwords_score =
       SHERPA_ONNX_OR(config->hotwords_score, 1.5);
+  recognizer_config.tokenize_hotwords =
+      SHERPA_ONNX_OR(config->tokenize_hotwords, true);
 
   recognizer_config.blank_penalty = config->blank_penalty;
   recognizer_config.tokenize_hotwords =
