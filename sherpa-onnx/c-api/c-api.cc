@@ -132,6 +132,8 @@ SherpaOnnxOnlineRecognizer *SherpaOnnxCreateOnlineRecognizer(
   }
 
   recognizer_config.blank_penalty = config->blank_penalty;
+  recognizer_config.tokenize_hotwords =
+      SHERPA_ONNX_OR(config->tokenize_hotwords, true);
 
   recognizer_config.ctc_fst_decoder_config.graph =
       SHERPA_ONNX_OR(config->ctc_fst_decoder_config.graph, "");
@@ -465,6 +467,8 @@ sherpa_onnx::OfflineRecognizerConfig convertConfig(
       SHERPA_ONNX_OR(config->hotwords_score, 1.5);
 
   recognizer_config.blank_penalty = config->blank_penalty;
+  recognizer_config.tokenize_hotwords =
+      SHERPA_ONNX_OR(config->tokenize_hotwords, true);
 
   recognizer_config.rule_fsts = SHERPA_ONNX_OR(config->rule_fsts, "");
   recognizer_config.rule_fars = SHERPA_ONNX_OR(config->rule_fars, "");
