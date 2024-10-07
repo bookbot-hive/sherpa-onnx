@@ -99,7 +99,7 @@ static OfflineTtsConfig GetOfflineTtsConfig(JNIEnv *env, jobject config) {
 }  // namespace sherpa_onnx
 
 SHERPA_ONNX_EXTERN_C
-JNIEXPORT jlong JNICALL Java_com_k2fsa_sherpa_onnx_OfflineTts_newForAsset(
+JNIEXPORT jlong JNICALL Java_com_k2fsa_sherpa_onnx_OfflineTts_newFromAsset(
     JNIEnv *env, jobject /*obj*/, jobject asset_manager, jobject _config) {
 #if __ANDROID_API__ >= 9
   AAssetManager *mgr = AAssetManager_fromJava(env, asset_manager);
@@ -136,19 +136,19 @@ JNIEXPORT jlong JNICALL Java_com_k2fsa_sherpa_onnx_OfflineTts_newFromFile(
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_OfflineTts_delete(
-    JNIEnv *env, jobject /*obj*/, jlong ptr) {
+    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr) {
   delete reinterpret_cast<sherpa_onnx::OfflineTts *>(ptr);
 }
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT jint JNICALL Java_com_k2fsa_sherpa_onnx_OfflineTts_getSampleRate(
-    JNIEnv *env, jobject /*obj*/, jlong ptr) {
+    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr) {
   return reinterpret_cast<sherpa_onnx::OfflineTts *>(ptr)->SampleRate();
 }
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT jint JNICALL Java_com_k2fsa_sherpa_onnx_OfflineTts_getNumSpeakers(
-    JNIEnv *env, jobject /*obj*/, jlong ptr) {
+    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr) {
   return reinterpret_cast<sherpa_onnx::OfflineTts *>(ptr)->NumSpeakers();
 }
 

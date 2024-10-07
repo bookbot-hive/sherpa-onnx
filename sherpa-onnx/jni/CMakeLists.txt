@@ -7,12 +7,14 @@ if(NOT DEFINED ANDROID_ABI)
   include_directories($ENV{JAVA_HOME}/include)
   include_directories($ENV{JAVA_HOME}/include/linux)
   include_directories($ENV{JAVA_HOME}/include/darwin)
+  include_directories($ENV{JAVA_HOME}/include/win32)
 endif()
 
 set(sources
   audio-tagging.cc
   jni.cc
   keyword-spotter.cc
+  offline-punctuation.cc
   offline-recognizer.cc
   offline-stream.cc
   online-recognizer.cc
@@ -21,6 +23,8 @@ set(sources
   speaker-embedding-manager.cc
   spoken-language-identification.cc
   voice-activity-detector.cc
+  wave-reader.cc
+  wave-writer.cc
 )
 
 if(SHERPA_ONNX_ENABLE_TTS)

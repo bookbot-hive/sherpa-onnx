@@ -8,32 +8,162 @@ log() {
   echo -e "$(date '+%Y-%m-%d %H:%M:%S') (${fname}:${BASH_LINENO[0]}:${FUNCNAME[1]}) $*"
 }
 
+export GIT_CLONE_PROTECTION_ACTIVE=false
+
 echo "EXE is $EXE"
 echo "PATH: $PATH"
 
 which $EXE
+
+log "test offline TeleSpeech CTC"
+url=https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-telespeech-ctc-int8-zh-2024-06-04.tar.bz2
+name=$(basename $url)
+repo=$(basename -s .tar.bz2 $name)
+
+curl -SL -O $url
+tar xvf $name
+rm $name
+ls -lh $repo
+
+test_wavs=(
+3-sichuan.wav
+4-tianjin.wav
+5-henan.wav
+)
+for w in ${test_wavs[@]}; do
+  time $EXE \
+    --tokens=$repo/tokens.txt \
+    --telespeech-ctc=$repo/model.int8.onnx \
+    --debug=1 \
+    $repo/test_wavs/$w
+done
+
+time $EXE \
+  --tokens=$repo/tokens.txt \
+  --telespeech-ctc=$repo/model.int8.onnx \
+  --debug=1 \
+  $repo/test_wavs/3-sichuan.wav \
+  $repo/test_wavs/4-tianjin.wav \
+  $repo/test_wavs/5-henan.wav
+
+rm -rf $repo
+
+log "-----------------------------------------------------------------"
+log "Run Nemo fast conformer hybrid transducer ctc models (CTC branch)"
+log "-----------------------------------------------------------------"
+
+url=https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-fast-conformer-ctc-be-de-en-es-fr-hr-it-pl-ru-uk-20k.tar.bz2
+name=$(basename $url)
+curl -SL -O $url
+tar xvf $name
+rm $name
+repo=$(basename -s .tar.bz2 $name)
+ls -lh $repo
+
+log "test $repo"
+test_wavs=(
+de-german.wav
+es-spanish.wav
+hr-croatian.wav
+po-polish.wav
+uk-ukrainian.wav
+en-english.wav
+fr-french.wav
+it-italian.wav
+ru-russian.wav
+)
+for w in ${test_wavs[@]}; do
+  time $EXE \
+    --tokens=$repo/tokens.txt \
+    --nemo-ctc-model=$repo/model.onnx \
+    --debug=1 \
+    $repo/test_wavs/$w
+done
+
+rm -rf $repo
+
+url=https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-fast-conformer-ctc-en-24500.tar.bz2
+name=$(basename $url)
+curl -SL -O $url
+tar xvf $name
+rm $name
+repo=$(basename -s .tar.bz2 $name)
+ls -lh $repo
+
+log "Test $repo"
+
+time $EXE \
+  --tokens=$repo/tokens.txt \
+  --nemo-ctc-model=$repo/model.onnx \
+  --debug=1 \
+  $repo/test_wavs/en-english.wav
+
+rm -rf $repo
+
+url=https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-fast-conformer-ctc-es-1424.tar.bz2
+name=$(basename $url)
+curl -SL -O $url
+tar xvf $name
+rm $name
+repo=$(basename -s .tar.bz2 $name)
+ls -lh $repo
+
+log "test $repo"
+
+time $EXE \
+  --tokens=$repo/tokens.txt \
+  --nemo-ctc-model=$repo/model.onnx \
+  --debug=1 \
+  $repo/test_wavs/es-spanish.wav
+
+rm -rf $repo
+
+url=https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-fast-conformer-ctc-en-de-es-fr-14288.tar.bz2
+name=$(basename $url)
+curl -SL -O $url
+tar xvf $name
+rm $name
+repo=$(basename -s .tar.bz2 $name)
+ls -lh $repo
+
+log "Test $repo"
+
+test_wavs=(
+en-english.wav
+de-german.wav
+fr-french.wav
+es-spanish.wav
+)
+
+for w in ${test_wavs[@]}; do
+  time $EXE \
+    --tokens=$repo/tokens.txt \
+    --nemo-ctc-model=$repo/model.onnx \
+    --debug=1 \
+    $repo/test_wavs/$w
+done
+
+rm -rf $repo
 
 log "------------------------------------------------------------"
 log "Run Wenet models"
 log "------------------------------------------------------------"
 wenet_models=(
 sherpa-onnx-zh-wenet-aishell
-sherpa-onnx-zh-wenet-aishell2
+# sherpa-onnx-zh-wenet-aishell2
 # sherpa-onnx-zh-wenet-wenetspeech
-sherpa-onnx-zh-wenet-multi-cn
+# sherpa-onnx-zh-wenet-multi-cn
 sherpa-onnx-en-wenet-librispeech
 # sherpa-onnx-en-wenet-gigaspeech
 )
 for name in ${wenet_models[@]}; do
-  repo_url=https://huggingface.co/csukuangfj/$name
+  repo_url=https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/$name.tar.bz2
   log "Start testing ${repo_url}"
-  repo=$(basename $repo_url)
+  repo=$name
   log "Download pretrained model and test-data from $repo_url"
-  GIT_LFS_SKIP_SMUDGE=1 git clone $repo_url
-  pushd $repo
-  git lfs pull --include "*.onnx"
-  ls -lh *.onnx
-  popd
+  curl -SL -O $repo_url
+  tar xvf $name.tar.bz2
+  rm $name.tar.bz2
 
   log "test float32 models"
   time $EXE \
@@ -57,16 +187,13 @@ done
 log "------------------------------------------------------------"
 log "Run tdnn yesno (Hebrew)"
 log "------------------------------------------------------------"
-repo_url=https://huggingface.co/csukuangfj/sherpa-onnx-tdnn-yesno
-log "Start testing ${repo_url}"
-repo=$(basename $repo_url)
-log "Download pretrained model and test-data from $repo_url"
-
-GIT_LFS_SKIP_SMUDGE=1 git clone $repo_url
-pushd $repo
-git lfs pull --include "*.onnx"
-ls -lh *.onnx
-popd
+url=https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-tdnn-yesno.tar.bz2
+curl -SL -O $url
+tar xvf sherpa-onnx-tdnn-yesno.tar.bz2
+rm sherpa-onnx-tdnn-yesno.tar.bz2
+log "Start testing ${url}"
+repo=sherpa-onnx-tdnn-yesno
+log "Download pretrained model and test-data from $url"
 
 log "test float32 models"
 time $EXE \
@@ -102,16 +229,13 @@ log "------------------------------------------------------------"
 log "Run Citrinet (stt_en_citrinet_512, English)"
 log "------------------------------------------------------------"
 
-repo_url=http://huggingface.co/csukuangfj/sherpa-onnx-nemo-ctc-en-citrinet-512
+repo_url=https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-ctc-en-citrinet-512.tar.bz2
+curl -SL -O $repo_url
+tar xvf sherpa-onnx-nemo-ctc-en-citrinet-512.tar.bz2
+rm sherpa-onnx-nemo-ctc-en-citrinet-512.tar.bz2
 log "Start testing ${repo_url}"
-repo=$(basename $repo_url)
+repo=sherpa-onnx-nemo-ctc-en-citrinet-512
 log "Download pretrained model and test-data from $repo_url"
-
-GIT_LFS_SKIP_SMUDGE=1 git clone $repo_url
-pushd $repo
-git lfs pull --include "*.onnx"
-ls -lh *.onnx
-popd
 
 time $EXE \
   --tokens=$repo/tokens.txt \
@@ -134,17 +258,13 @@ rm -rf $repo
 log "------------------------------------------------------------"
 log "Run Librispeech zipformer CTC H/HL/HLG decoding (English)   "
 log "------------------------------------------------------------"
-repo_url=https://huggingface.co/csukuangfj/sherpa-onnx-zipformer-ctc-en-2023-10-02
+repo_url=https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-zipformer-ctc-en-2023-10-02.tar.bz2
+curl -SL -O $repo_url
 log "Start testing ${repo_url}"
-repo=$(basename $repo_url)
+tar xvf sherpa-onnx-zipformer-ctc-en-2023-10-02.tar.bz2
+rm sherpa-onnx-zipformer-ctc-en-2023-10-02.tar.bz2
+repo=sherpa-onnx-zipformer-ctc-en-2023-10-02
 log "Download pretrained model and test-data from $repo_url"
-
-GIT_LFS_SKIP_SMUDGE=1 git clone $repo_url
-pushd $repo
-git lfs pull --include "*.onnx"
-git lfs pull --include "*.fst"
-ls -lh
-popd
 
 graphs=(
 $repo/H.fst

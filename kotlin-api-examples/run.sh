@@ -6,11 +6,9 @@
 
 set -ex
 
-cd ..
-mkdir -p build
-cd build
-
 if [[ ! -f ../build/lib/libsherpa-onnx-jni.dylib  && ! -f ../build/lib/libsherpa-onnx-jni.so ]]; then
+  mkdir -p ../build
+  pushd ../build
   cmake \
     -DSHERPA_ONNX_ENABLE_PYTHON=OFF \
     -DSHERPA_ONNX_ENABLE_TESTS=OFF \
@@ -22,11 +20,10 @@ if [[ ! -f ../build/lib/libsherpa-onnx-jni.dylib  && ! -f ../build/lib/libsherpa
 
   make -j4
   ls -lh lib
+  popd
 fi
 
 export LD_LIBRARY_PATH=$PWD/build/lib:$LD_LIBRARY_PATH
-
-cd ../kotlin-api-examples
 
 function testSpeakerEmbeddingExtractor() {
   if [ ! -f ./3dspeaker_speech_eres2net_large_sv_zh-cn_3dspeaker_16k.onnx ]; then
@@ -63,13 +60,25 @@ function testSpeakerEmbeddingExtractor() {
 function testOnlineAsr() {
   if [ ! -f ./sherpa-onnx-streaming-zipformer-en-2023-02-21/tokens.txt ]; then
     git lfs install
-    git clone https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-en-2023-02-21
+    GIT_CLONE_PROTECTION_ACTIVE=false git clone https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-en-2023-02-21
+  fi
+
+  if [ ! -f ./sherpa-onnx-nemo-streaming-fast-conformer-ctc-en-80ms/tokens.txt ]; then
+    curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-streaming-fast-conformer-ctc-en-80ms.tar.bz2
+    tar xvf sherpa-onnx-nemo-streaming-fast-conformer-ctc-en-80ms.tar.bz2
+    rm sherpa-onnx-nemo-streaming-fast-conformer-ctc-en-80ms.tar.bz2
   fi
 
   if [ ! -d ./sherpa-onnx-streaming-zipformer-ctc-multi-zh-hans-2023-12-13 ]; then
     curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-ctc-multi-zh-hans-2023-12-13.tar.bz2
     tar xvf sherpa-onnx-streaming-zipformer-ctc-multi-zh-hans-2023-12-13.tar.bz2
     rm sherpa-onnx-streaming-zipformer-ctc-multi-zh-hans-2023-12-13.tar.bz2
+  fi
+
+  if [ ! -d ./sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18 ]; then
+    curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18.tar.bz2
+    tar xvf sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18.tar.bz2
+    rm sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18.tar.bz2
   fi
 
   out_filename=test_online_asr.jar
@@ -163,6 +172,24 @@ function testOfflineAsr() {
     rm sherpa-onnx-whisper-tiny.en.tar.bz2
   fi
 
+  if [ ! -f ./sherpa-onnx-nemo-ctc-en-citrinet-512/tokens.txt ]; then
+    curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-ctc-en-citrinet-512.tar.bz2
+    tar xvf sherpa-onnx-nemo-ctc-en-citrinet-512.tar.bz2
+    rm sherpa-onnx-nemo-ctc-en-citrinet-512.tar.bz2
+  fi
+
+  if [ ! -f ./sherpa-onnx-paraformer-zh-2023-03-28/tokens.txt ]; then
+    curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-2023-03-28.tar.bz2
+    tar xvf sherpa-onnx-paraformer-zh-2023-03-28.tar.bz2
+    rm sherpa-onnx-paraformer-zh-2023-03-28.tar.bz2
+  fi
+
+  if [ ! -f ./sherpa-onnx-zipformer-multi-zh-hans-2023-9-2/tokens.txt ]; then
+    curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-zipformer-multi-zh-hans-2023-9-2.tar.bz2
+    tar xvf sherpa-onnx-zipformer-multi-zh-hans-2023-9-2.tar.bz2
+    rm sherpa-onnx-zipformer-multi-zh-hans-2023-9-2.tar.bz2
+  fi
+
   out_filename=test_offline_asr.jar
   kotlinc-jvm -include-runtime -d $out_filename \
     test_offline_asr.kt \
@@ -176,9 +203,87 @@ function testOfflineAsr() {
   java -Djava.library.path=../build/lib -jar $out_filename
 }
 
+function testInverseTextNormalizationOfflineAsr() {
+  if [ ! -f ./sherpa-onnx-paraformer-zh-2023-03-28/tokens.txt ]; then
+    curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-2023-03-28.tar.bz2
+    tar xvf sherpa-onnx-paraformer-zh-2023-03-28.tar.bz2
+    rm sherpa-onnx-paraformer-zh-2023-03-28.tar.bz2
+  fi
+
+  if [ ! -f ./itn-zh-number.wav ]; then
+    curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/itn-zh-number.wav
+  fi
+
+  if [ ! -f ./itn_zh_number.fst ]; then
+    curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/itn_zh_number.fst
+  fi
+
+  out_filename=test_itn_offline_asr.jar
+  kotlinc-jvm -include-runtime -d $out_filename \
+    test_itn_offline_asr.kt \
+    FeatureConfig.kt \
+    OfflineRecognizer.kt \
+    OfflineStream.kt \
+    WaveReader.kt \
+    faked-asset-manager.kt
+
+  ls -lh $out_filename
+  java -Djava.library.path=../build/lib -jar $out_filename
+}
+
+function testInverseTextNormalizationOnlineAsr() {
+  if [ ! -f ./sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/tokens.txt ]; then
+    curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.tar.bz2
+    tar xvf sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.tar.bz2
+    rm sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.tar.bz2
+  fi
+
+  if [ ! -f ./itn-zh-number.wav ]; then
+    curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/itn-zh-number.wav
+  fi
+
+  if [ ! -f ./itn_zh_number.fst ]; then
+    curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/itn_zh_number.fst
+  fi
+
+  out_filename=test_itn_online_asr.jar
+  kotlinc-jvm -include-runtime -d $out_filename \
+    test_itn_online_asr.kt \
+    FeatureConfig.kt \
+    OnlineRecognizer.kt \
+    OnlineStream.kt \
+    WaveReader.kt \
+    faked-asset-manager.kt
+
+  ls -lh $out_filename
+  java -Djava.library.path=../build/lib -jar $out_filename
+}
+
+function testPunctuation() {
+  if [ ! -f ./sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12/model.onnx ]; then
+    curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/punctuation-models/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12.tar.bz2
+    tar xvf sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12.tar.bz2
+    rm sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12.tar.bz2
+  fi
+
+  out_filename=test_punctuation.jar
+  kotlinc-jvm -include-runtime -d $out_filename \
+    ./test_punctuation.kt \
+    ./OfflinePunctuation.kt \
+    faked-asset-manager.kt \
+    faked-log.kt
+
+  ls -lh $out_filename
+
+  java -Djava.library.path=../build/lib -jar $out_filename
+}
+
 testSpeakerEmbeddingExtractor
 testOnlineAsr
 testTts
 testAudioTagging
 testSpokenLanguageIdentification
 testOfflineAsr
+testPunctuation
+testInverseTextNormalizationOfflineAsr
+testInverseTextNormalizationOnlineAsr

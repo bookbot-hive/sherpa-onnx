@@ -79,6 +79,10 @@ SherpaOnnxOnlineRecognizer *CreateOnlineRecognizer(
       SHERPA_ONNX_OR(config->model_config.model_type, "");
   recognizer_config.model_config.debug =
       SHERPA_ONNX_OR(config->model_config.debug, 0);
+  recognizer_config.model_config.modeling_unit =
+      SHERPA_ONNX_OR(config->model_config.modeling_unit, "cjkchar");
+  recognizer_config.model_config.bpe_vocab =
+      SHERPA_ONNX_OR(config->model_config.bpe_vocab, "");
 
   recognizer_config.decoding_method =
       SHERPA_ONNX_OR(config->decoding_method, "greedy_search");
@@ -100,11 +104,16 @@ SherpaOnnxOnlineRecognizer *CreateOnlineRecognizer(
   recognizer_config.hotwords_file = SHERPA_ONNX_OR(config->hotwords_file, "");
   recognizer_config.hotwords_score =
       SHERPA_ONNX_OR(config->hotwords_score, 1.5);
+  recognizer_config.tokenize_hotwords =
+      SHERPA_ONNX_OR(config->tokenize_hotwords, true);
 
   recognizer_config.ctc_fst_decoder_config.graph =
       SHERPA_ONNX_OR(config->ctc_fst_decoder_config.graph, "");
   recognizer_config.ctc_fst_decoder_config.max_active =
       SHERPA_ONNX_OR(config->ctc_fst_decoder_config.max_active, 3000);
+
+  recognizer_config.rule_fsts = SHERPA_ONNX_OR(config->rule_fsts, "");
+  recognizer_config.rule_fars = SHERPA_ONNX_OR(config->rule_fars, "");
 
   if (config->model_config.debug) {
     SHERPA_ONNX_LOGE("%s\n", recognizer_config.ToString().c_str());
@@ -187,7 +196,7 @@ const SherpaOnnxOnlineRecognizerResult *GetOnlineStreamResult(
   r->text = pText;
 
   // copy json
-  const auto &json = result.AsJsonString();
+  std::string json = result.AsJsonString();
   char *pJson = new char[json.size() + 1];
   std::copy(json.begin(), json.end(), pJson);
   pJson[json.size()] = 0;
@@ -341,6 +350,9 @@ SherpaOnnxOfflineRecognizer *CreateOfflineRecognizer(
     recognizer_config.model_config.whisper.task = "transcribe";
   }
 
+  recognizer_config.model_config.whisper.tail_paddings =
+      SHERPA_ONNX_OR(config->model_config.whisper.tail_paddings, -1);
+
   recognizer_config.model_config.tdnn.model =
       SHERPA_ONNX_OR(config->model_config.tdnn.model, "");
 
@@ -354,6 +366,13 @@ SherpaOnnxOfflineRecognizer *CreateOfflineRecognizer(
       SHERPA_ONNX_OR(config->model_config.provider, "cpu");
   recognizer_config.model_config.model_type =
       SHERPA_ONNX_OR(config->model_config.model_type, "");
+  recognizer_config.model_config.modeling_unit =
+      SHERPA_ONNX_OR(config->model_config.modeling_unit, "cjkchar");
+  recognizer_config.model_config.bpe_vocab =
+      SHERPA_ONNX_OR(config->model_config.bpe_vocab, "");
+
+  recognizer_config.model_config.telespeech_ctc =
+      SHERPA_ONNX_OR(config->model_config.telespeech_ctc, "");
 
   recognizer_config.lm_config.model =
       SHERPA_ONNX_OR(config->lm_config.model, "");
@@ -373,6 +392,11 @@ SherpaOnnxOfflineRecognizer *CreateOfflineRecognizer(
   recognizer_config.hotwords_file = SHERPA_ONNX_OR(config->hotwords_file, "");
   recognizer_config.hotwords_score =
       SHERPA_ONNX_OR(config->hotwords_score, 1.5);
+  recognizer_config.tokenize_hotwords =
+      SHERPA_ONNX_OR(config->tokenize_hotwords, true);
+
+  recognizer_config.rule_fsts = SHERPA_ONNX_OR(config->rule_fsts, "");
+  recognizer_config.rule_fars = SHERPA_ONNX_OR(config->rule_fars, "");
 
   if (config->model_config.debug) {
     SHERPA_ONNX_LOGE("%s", recognizer_config.ToString().c_str());
@@ -441,14 +465,49 @@ const SherpaOnnxOfflineRecognizerResult *GetOfflineStreamResult(
   pText[text.size()] = 0;
   r->text = pText;
 
-  if (!result.timestamps.empty()) {
-    r->timestamps = new float[result.timestamps.size()];
-    std::copy(result.timestamps.begin(), result.timestamps.end(),
-              r->timestamps);
-    r->count = result.timestamps.size();
+  // copy json
+  std::string json = result.AsJsonString();
+  char *pJson = new char[json.size() + 1];
+  std::copy(json.begin(), json.end(), pJson);
+  pJson[json.size()] = 0;
+  r->json = pJson;
+
+  // copy tokens
+  auto count = result.tokens.size();
+  if (count > 0) {
+    size_t total_length = 0;
+    for (const auto &token : result.tokens) {
+      // +1 for the null character at the end of each token
+      total_length += token.size() + 1;
+    }
+
+    r->count = count;
+    // Each word ends with nullptr
+    char *tokens = new char[total_length]{};
+    char **tokens_temp = new char *[r->count];
+    int32_t pos = 0;
+    for (int32_t i = 0; i < r->count; ++i) {
+      tokens_temp[i] = tokens + pos;
+      memcpy(tokens + pos, result.tokens[i].c_str(), result.tokens[i].size());
+      // +1 to move past the null character
+      pos += result.tokens[i].size() + 1;
+    }
+    r->tokens_arr = tokens_temp;
+
+    if (!result.timestamps.empty()) {
+      r->timestamps = new float[r->count];
+      std::copy(result.timestamps.begin(), result.timestamps.end(),
+                r->timestamps);
+    } else {
+      r->timestamps = nullptr;
+    }
+
+    r->tokens = tokens;
   } else {
-    r->timestamps = nullptr;
     r->count = 0;
+    r->timestamps = nullptr;
+    r->tokens = nullptr;
+    r->tokens_arr = nullptr;
   }
 
   return r;
@@ -459,6 +518,9 @@ void DestroyOfflineRecognizerResult(
   if (r) {
     delete[] r->text;
     delete[] r->timestamps;
+    delete[] r->tokens;
+    delete[] r->tokens_arr;
+    delete[] r->json;
     delete r;
   }
 }
@@ -558,6 +620,13 @@ SherpaOnnxOnlineStream *CreateKeywordStream(
   return stream;
 }
 
+SherpaOnnxOnlineStream *CreateKeywordStreamWithKeywords(
+    const SherpaOnnxKeywordSpotter *spotter, const char *keywords) {
+  SherpaOnnxOnlineStream *stream =
+      new SherpaOnnxOnlineStream(spotter->impl->CreateStream(keywords));
+  return stream;
+}
+
 int32_t IsKeywordStreamReady(SherpaOnnxKeywordSpotter *spotter,
                              SherpaOnnxOnlineStream *stream) {
   return spotter->impl->IsReady(stream->impl.get());
@@ -595,7 +664,7 @@ const SherpaOnnxKeywordResult *GetKeywordResult(
   r->keyword = pKeyword;
 
   // copy json
-  const auto &json = result.AsJsonString();
+  std::string json = result.AsJsonString();
   char *pJson = new char[json.size() + 1];
   std::copy(json.begin(), json.end(), pJson);
   pJson[json.size()] = 0;
@@ -652,6 +721,20 @@ void DestroyKeywordResult(const SherpaOnnxKeywordResult *r) {
     delete r;
   }
 }
+
+const char *GetKeywordResultAsJson(SherpaOnnxKeywordSpotter *spotter,
+                                   SherpaOnnxOnlineStream *stream) {
+  const sherpa_onnx::KeywordResult &result =
+      spotter->impl->GetResult(stream->impl.get());
+
+  std::string json = result.AsJsonString();
+  char *pJson = new char[json.size() + 1];
+  std::copy(json.begin(), json.end(), pJson);
+  pJson[json.size()] = 0;
+  return pJson;
+}
+
+void FreeKeywordResultJson(const char *s) { delete[] s; }
 
 // ============================================================
 // For VAD
@@ -818,6 +901,8 @@ SherpaOnnxOfflineTts *SherpaOnnxCreateOfflineTts(
       SHERPA_ONNX_OR(config->model.vits.noise_scale_w, 0.8);
   tts_config.model.vits.length_scale =
       SHERPA_ONNX_OR(config->model.vits.length_scale, 1.0);
+  tts_config.model.vits.dict_dir =
+      SHERPA_ONNX_OR(config->model.vits.dict_dir, "");
 
   tts_config.model.num_threads = SHERPA_ONNX_OR(config->model.num_threads, 1);
   tts_config.model.debug = config->model.debug;

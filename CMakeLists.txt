@@ -1,7 +1,14 @@
 cmake_minimum_required(VERSION 3.13 FATAL_ERROR)
+
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.14" CACHE STRING "Minimum OS X deployment version. Used only for macOS")
+
 project(sherpa-onnx)
 
-set(SHERPA_ONNX_VERSION "1.9.22")
+# Remember to update
+# ./nodejs-addon-examples
+# ./dart-api-examples/
+# ./sherpa-onnx/flutter/CHANGELOG.md
+set(SHERPA_ONNX_VERSION "1.10.0")
 
 # Disable warning about
 #
@@ -29,6 +36,7 @@ option(SHERPA_ONNX_ENABLE_BINARY "Whether to build binaries" ON)
 option(SHERPA_ONNX_ENABLE_TTS "Whether to build TTS related code" ON)
 option(SHERPA_ONNX_LINK_LIBSTDCPP_STATICALLY "True to link libstdc++ statically. Used only when BUILD_SHARED_LIBS is OFF on Linux" ON)
 option(SHERPA_ONNX_USE_PRE_INSTALLED_ONNXRUNTIME_IF_AVAILABLE "True to use pre-installed onnxruntime if available" ON)
+option(SHERPA_ONNX_ENABLE_SANITIZER "Whether to enable ubsan and asan" OFF)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
@@ -118,6 +126,7 @@ message(STATUS "SHERPA_ONNX_ENABLE_BINARY ${SHERPA_ONNX_ENABLE_BINARY}")
 message(STATUS "SHERPA_ONNX_ENABLE_TTS ${SHERPA_ONNX_ENABLE_TTS}")
 message(STATUS "SHERPA_ONNX_LINK_LIBSTDCPP_STATICALLY ${SHERPA_ONNX_LINK_LIBSTDCPP_STATICALLY}")
 message(STATUS "SHERPA_ONNX_USE_PRE_INSTALLED_ONNXRUNTIME_IF_AVAILABLE ${SHERPA_ONNX_USE_PRE_INSTALLED_ONNXRUNTIME_IF_AVAILABLE}")
+message(STATUS "SHERPA_ONNX_ENABLE_SANITIZER: ${SHERPA_ONNX_ENABLE_SANITIZER}")
 
 if(SHERPA_ONNX_ENABLE_TTS)
   message(STATUS "TTS is enabled")
@@ -158,7 +167,7 @@ if(SHERPA_ONNX_ENABLE_WASM_KWS)
 endif()
 
 if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 14 CACHE STRING "The C++ version to be used.")
+  set(CMAKE_CXX_STANDARD 17 CACHE STRING "The C++ version to be used.")
 endif()
 set(CMAKE_CXX_EXTENSIONS OFF)
 message(STATUS "C++ Standard version: ${CMAKE_CXX_STANDARD}")
@@ -234,6 +243,7 @@ endif()
 include(kaldi-native-fbank)
 include(kaldi-decoder)
 include(onnxruntime)
+include(simple-sentencepiece)
 set(ONNXRUNTIME_DIR ${onnxruntime_SOURCE_DIR})
 message(STATUS "ONNXRUNTIME_DIR: ${ONNXRUNTIME_DIR}")
 
@@ -263,9 +273,37 @@ if(SHERPA_ONNX_ENABLE_TTS)
   include(cppjieba) # For Chinese TTS. It is a header-only C++ library
 endif()
 
+# if(NOT MSVC AND CMAKE_BUILD_TYPE STREQUAL Debug AND (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang"))
+if(SHERPA_ONNX_ENABLE_SANITIZER)
+  message(WARNING "enable ubsan and asan")
+  set(CMAKE_REQUIRED_LIBRARIES -lubsan -lasan)
+  include(CheckCCompilerFlag)
+
+  set(flags -fsanitize=undefined )
+  string(APPEND flags " -fno-sanitize-recover=undefined ")
+  string(APPEND flags " -fsanitize=integer ")
+  string(APPEND flags " -fsanitize=nullability ")
+  string(APPEND flags " -fsanitize=implicit-conversion ")
+  string(APPEND flags " -fsanitize=bounds ")
+  string(APPEND flags " -fsanitize=address ")
+
+  if(OFF)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${flags} -Wall -Wextra")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${flags} -Wall -Wextra")
+  else()
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${flags}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${flags}")
+  endif()
+
+  set(CMAKE_EXECUTBLE_LINKER_FLAGS "${CMAKE_EXECUTBLE_LINKER_FLAGS} ${flags}")
+
+  add_compile_options(-fno-omit-frame-pointer)
+endif()
+
 add_subdirectory(sherpa-onnx)
 
 if(SHERPA_ONNX_ENABLE_C_API AND SHERPA_ONNX_ENABLE_BINARY)
+  set(SHERPA_ONNX_PKG_WITH_CARGS "-lcargs")
   add_subdirectory(c-api-examples)
 endif()
 

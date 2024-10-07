@@ -51,7 +51,7 @@ class Client {
     c_.init_asio(&io_);
     c_.set_open_handler([this](connection_hdl hdl) { OnOpen(hdl); });
     c_.set_close_handler(
-        [this](connection_hdl /*hdl*/) { SHERPA_ONNX_LOGE("Disconnected"); });
+        [](connection_hdl /*hdl*/) { SHERPA_ONNX_LOGE("Disconnected"); });
     c_.set_message_handler(
         [this](connection_hdl hdl, message_ptr msg) { OnMessage(hdl, msg); });
 
@@ -253,7 +253,7 @@ int32_t main(int32_t argc, char *argv[]) {
       sherpa_onnx::ReadWave(wave_filename, &actual_sample_rate, &is_ok);
 
   if (!is_ok) {
-    SHERPA_ONNX_LOGE("Failed to read %s", wave_filename.c_str());
+    SHERPA_ONNX_LOGE("Failed to read '%s'", wave_filename.c_str());
     return -1;
   }
 

@@ -39,10 +39,13 @@ set(sources
   offline-stream.cc
   offline-tdnn-ctc-model.cc
   offline-tdnn-model-config.cc
+  offline-telespeech-ctc-model.cc
   offline-transducer-greedy-search-decoder.cc
+  offline-transducer-greedy-search-nemo-decoder.cc
   offline-transducer-model-config.cc
   offline-transducer-model.cc
   offline-transducer-modified-beam-search-decoder.cc
+  offline-transducer-nemo-model.cc
   offline-wenet-ctc-model-config.cc
   offline-wenet-ctc-model.cc
   offline-whisper-greedy-search-decoder.cc
@@ -59,6 +62,8 @@ set(sources
   online-lm.cc
   online-lstm-transducer-model.cc
   online-model-config.cc
+  online-nemo-ctc-model-config.cc
+  online-nemo-ctc-model.cc
   online-paraformer-model-config.cc
   online-paraformer-model.cc
   online-recognizer-impl.cc
@@ -70,6 +75,8 @@ set(sources
   online-transducer-model-config.cc
   online-transducer-model.cc
   online-transducer-modified-beam-search-decoder.cc
+  online-transducer-nemo-model.cc
+  online-transducer-greedy-search-nemo-decoder.cc
   online-wenet-ctc-model-config.cc
   online-wenet-ctc-model.cc
   online-zipformer-transducer-model.cc
@@ -161,6 +168,7 @@ endif()
 target_link_libraries(sherpa-onnx-core
   kaldi-native-fbank-core
   kaldi-decoder-core
+  ssentencepiece_core
 )
 
 if(SHERPA_ONNX_ENABLE_GPU)
@@ -182,9 +190,10 @@ if(NOT BUILD_SHARED_LIBS AND APPLE)
   target_link_libraries(sherpa-onnx-core "-framework Foundation")
 endif()
 
+target_link_libraries(sherpa-onnx-core fstfar fst)
+
 if(SHERPA_ONNX_ENABLE_TTS)
   target_link_libraries(sherpa-onnx-core piper_phonemize)
-  target_link_libraries(sherpa-onnx-core fstfar fst)
   target_link_libraries(sherpa-onnx-core cppjieba)
 endif()
 
@@ -487,6 +496,7 @@ if(SHERPA_ONNX_ENABLE_TESTS)
     pad-sequence-test.cc
     slice-test.cc
     stack-test.cc
+    text2token-test.cc
     transpose-test.cc
     unbind-test.cc
     utfcpp-test.cc
@@ -524,3 +534,17 @@ if(SHERPA_ONNX_ENABLE_TESTS)
     sherpa_onnx_add_test(${source})
   endforeach()
 endif()
+
+set(srcs_to_check)
+foreach(s IN LISTS sources)
+  list(APPEND srcs_to_check ${CMAKE_CURRENT_LIST_DIR}/${s})
+endforeach()
+
+# For clang-tidy
+add_custom_target(
+  clang-tidy-check
+  clang-tidy -p ${CMAKE_BINARY_DIR}/compile_commands.json --config-file ${CMAKE_SOURCE_DIR}/.clang-tidy ${srcs_to_check}
+  DEPENDS ${sources})
+
+add_custom_target(check DEPENDS clang-tidy-check)
+

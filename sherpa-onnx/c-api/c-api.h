@@ -82,6 +82,12 @@ SHERPA_ONNX_API typedef struct SherpaOnnxOnlineModelConfig {
   const char *provider;
   int32_t debug;  // true to print debug information of the model
   const char *model_type;
+  // Valid values:
+  //  - cjkchar
+  //  - bpe
+  //  - cjkchar+bpe
+  const char *modeling_unit;
+  const char *bpe_vocab;
 } SherpaOnnxOnlineModelConfig;
 
 /// It expects 16 kHz 16-bit single channel wave format.
@@ -137,7 +143,12 @@ SHERPA_ONNX_API typedef struct SherpaOnnxOnlineRecognizerConfig {
   /// Bonus score for each token in hotwords.
   float hotwords_score;
 
+  /// Whether to tokenize hotwords
+  bool tokenize_hotwords;
+
   SherpaOnnxOnlineCtcFstDecoderConfig ctc_fst_decoder_config;
+  const char *rule_fsts;
+  const char *rule_fars;
 } SherpaOnnxOnlineRecognizerConfig;
 
 SHERPA_ONNX_API typedef struct SherpaOnnxOnlineRecognizerResult {
@@ -359,6 +370,7 @@ SHERPA_ONNX_API typedef struct SherpaOnnxOfflineWhisperModelConfig {
   const char *decoder;
   const char *language;
   const char *task;
+  int32_t tail_paddings;
 } SherpaOnnxOfflineWhisperModelConfig;
 
 SHERPA_ONNX_API typedef struct SherpaOnnxOfflineTdnnModelConfig {
@@ -382,6 +394,13 @@ SHERPA_ONNX_API typedef struct SherpaOnnxOfflineModelConfig {
   int32_t debug;
   const char *provider;
   const char *model_type;
+  // Valid values:
+  //  - cjkchar
+  //  - bpe
+  //  - cjkchar+bpe
+  const char *modeling_unit;
+  const char *bpe_vocab;
+  const char *telespeech_ctc;
 } SherpaOnnxOfflineModelConfig;
 
 SHERPA_ONNX_API typedef struct SherpaOnnxOfflineRecognizerConfig {
@@ -397,6 +416,12 @@ SHERPA_ONNX_API typedef struct SherpaOnnxOfflineRecognizerConfig {
 
   /// Bonus score for each token in hotwords.
   float hotwords_score;
+
+  /// Whether to tokenize hotwords
+  bool tokenize_hotwords;
+
+  const char *rule_fsts;
+  const char *rule_fars;
 } SherpaOnnxOfflineRecognizerConfig;
 
 SHERPA_ONNX_API typedef struct SherpaOnnxOfflineRecognizer
@@ -480,7 +505,27 @@ SHERPA_ONNX_API typedef struct SherpaOnnxOfflineRecognizerResult {
 
   // number of entries in timestamps
   int32_t count;
-  // TODO(fangjun): Add more fields
+
+  // Pointer to continuous memory which holds string based tokens
+  // which are separated by \0
+  const char *tokens;
+
+  // a pointer array containing the address of the first item in tokens
+  const char *const *tokens_arr;
+
+  /** Return a json string.
+   *
+   * The returned string contains:
+   *   {
+   *     "text": "The recognition result",
+   *     "tokens": [x, x, x],
+   *     "timestamps": [x, x, x],
+   *     "segment": x,
+   *     "start_time": x,
+   *     "is_final": true|false
+   *   }
+   */
+  const char *json;
 } SherpaOnnxOfflineRecognizerResult;
 
 /// Get the result of the offline stream.
@@ -582,6 +627,16 @@ SHERPA_ONNX_API void DestroyKeywordSpotter(SherpaOnnxKeywordSpotter *spotter);
 SHERPA_ONNX_API SherpaOnnxOnlineStream *CreateKeywordStream(
     const SherpaOnnxKeywordSpotter *spotter);
 
+/// Create an online stream for accepting wave samples with the specified hot
+/// words.
+///
+/// @param spotter A pointer returned by CreateKeywordSpotter()
+/// @param keywords A pointer points to the keywords that you set
+/// @return Return a pointer to an OnlineStream. The user has to invoke
+///         DestroyOnlineStream() to free it to avoid memory leak.
+SHERPA_ONNX_API SherpaOnnxOnlineStream *CreateKeywordStreamWithKeywords(
+    const SherpaOnnxKeywordSpotter *spotter, const char *keywords);
+
 /// Return 1 if there are enough number of feature frames for decoding.
 /// Return 0 otherwise.
 ///
@@ -612,7 +667,7 @@ SHERPA_ONNX_API void DecodeMultipleKeywordStreams(
 
 /// Get the decoding results so far for an OnlineStream.
 ///
-/// @param recognizer A pointer returned by CreateKeywordSpotter().
+/// @param spotter A pointer returned by CreateKeywordSpotter().
 /// @param stream A pointer returned by CreateKeywordStream().
 /// @return A pointer containing the result. The user has to invoke
 ///         DestroyKeywordResult() to free the returned pointer to
@@ -624,6 +679,13 @@ SHERPA_ONNX_API const SherpaOnnxKeywordResult *GetKeywordResult(
 ///
 /// @param r A pointer returned by GetKeywordResult()
 SHERPA_ONNX_API void DestroyKeywordResult(const SherpaOnnxKeywordResult *r);
+
+// the user has to call FreeKeywordResultJson() to free the returned pointer
+// to avoid memory leak
+SHERPA_ONNX_API const char *GetKeywordResultAsJson(
+    SherpaOnnxKeywordSpotter *spotter, SherpaOnnxOnlineStream *stream);
+
+SHERPA_ONNX_API void FreeKeywordResultJson(const char *s);
 
 // ============================================================
 // For VAD
@@ -772,6 +834,7 @@ SHERPA_ONNX_API typedef struct SherpaOnnxOfflineTtsVitsModelConfig {
   float noise_scale;
   float noise_scale_w;
   float length_scale;  // < 1, faster in speed; > 1, slower in speed
+  const char *dict_dir;
 } SherpaOnnxOfflineTtsVitsModelConfig;
 
 SHERPA_ONNX_API typedef struct SherpaOnnxOfflineTtsModelConfig {
@@ -822,7 +885,7 @@ SHERPA_ONNX_API int32_t
 SherpaOnnxOfflineTtsNumSpeakers(const SherpaOnnxOfflineTts *tts);
 
 // Generate audio from the given text and speaker id (sid).
-// The user has to use DestroyOfflineTtsGeneratedAudio() to free the
+// The user has to use SherpaOnnxDestroyOfflineTtsGeneratedAudio() to free the
 // returned pointer to avoid memory leak.
 SHERPA_ONNX_API const SherpaOnnxGeneratedAudio *SherpaOnnxOfflineTtsGenerate(
     const SherpaOnnxOfflineTts *tts, const char *text, int32_t sid,

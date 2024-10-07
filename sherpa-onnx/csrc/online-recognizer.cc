@@ -5,16 +5,17 @@
 
 #include "sherpa-onnx/csrc/online-recognizer.h"
 
-#include <assert.h>
-
 #include <algorithm>
+#include <cassert>
 #include <iomanip>
 #include <memory>
 #include <sstream>
 #include <utility>
 #include <vector>
 
+#include "sherpa-onnx/csrc/file-utils.h"
 #include "sherpa-onnx/csrc/online-recognizer-impl.h"
+#include "sherpa-onnx/csrc/text-utils.h"
 
 namespace sherpa_onnx {
 
@@ -22,14 +23,16 @@ namespace sherpa_onnx {
 template <typename T>
 std::string VecToString(const std::vector<T> &vec, int32_t precision = 6) {
   std::ostringstream oss;
-  oss << std::fixed << std::setprecision(precision);
-  oss << "[ ";
+  if (precision != 0) {
+    oss << std::fixed << std::setprecision(precision);
+  }
+  oss << "[";
   std::string sep = "";
   for (const auto &item : vec) {
     oss << sep << item;
     sep = ", ";
   }
-  oss << " ]";
+  oss << "]";
   return oss.str();
 }
 
@@ -38,13 +41,13 @@ template <>  // explicit specialization for T = std::string
 std::string VecToString<std::string>(const std::vector<std::string> &vec,
                                      int32_t) {  // ignore 2nd arg
   std::ostringstream oss;
-  oss << "[ ";
+  oss << "[";
   std::string sep = "";
   for (const auto &item : vec) {
     oss << sep << "\"" << item << "\"";
     sep = ", ";
   }
-  oss << " ]";
+  oss << "]";
   return oss.str();
 }
 
@@ -60,6 +63,7 @@ std::string OnlineRecognizerResult::AsJsonString() const {
   os << "\"lm_probs\": " << VecToString(lm_probs, 6) << ", ";
   os << "\"context_scores\": " << VecToString(context_scores, 6) << ", ";
   os << "\"segment\": " << segment << ", ";
+  os << "\"words\": " << VecToString(words, 0) << ", ";
   os << "\"start_time\": " << std::fixed << std::setprecision(2) << start_time
      << ", ";
   os << "\"is_final\": " << (is_final ? "true" : "false");
@@ -89,13 +93,27 @@ void OnlineRecognizerConfig::Register(ParseOptions *po) {
                "Used only when decoding_method is modified_beam_search");
   po->Register(
       "hotwords-file", &hotwords_file,
-      "The file containing hotwords, one words/phrases per line, and for each"
-      "phrase the bpe/cjkchar are separated by a space. For example: "
-      "▁HE LL O ▁WORLD"
-      "你 好 世 界");
+      "The file containing hotwords, one words/phrases per line, For example: "
+      "HELLO WORLD"
+      "你好世界");
+  po->Register(
+      "tokenize-hotwords", &tokenize_hotwords,
+      "Whether to tokenize hotwords, default true, if false the input hotwords "
+      "should be tokenized into tokens");
   po->Register("decoding-method", &decoding_method,
                "decoding method,"
                "now support greedy_search and modified_beam_search.");
+  po->Register("temperature-scale", &temperature_scale,
+               "Temperature scale for confidence computation in decoding.");
+  po->Register(
+      "rule-fsts", &rule_fsts,
+      "If not empty, it specifies fsts for inverse text normalization. "
+      "If there are multiple fsts, they are separated by a comma.");
+
+  po->Register(
+      "rule-fars", &rule_fars,
+      "If not empty, it specifies fst archives for inverse text normalization. "
+      "If there are multiple archives, they are separated by a comma.");
 }
 
 bool OnlineRecognizerConfig::Validate() const {
@@ -125,6 +143,34 @@ bool OnlineRecognizerConfig::Validate() const {
     return false;
   }
 
+  if (!hotwords_file.empty() && !FileExists(hotwords_file)) {
+    SHERPA_ONNX_LOGE("--hotwords-file: '%s' does not exist",
+                     hotwords_file.c_str());
+    return false;
+  }
+
+  if (!rule_fsts.empty()) {
+    std::vector<std::string> files;
+    SplitStringToVector(rule_fsts, ",", false, &files);
+    for (const auto &f : files) {
+      if (!FileExists(f)) {
+        SHERPA_ONNX_LOGE("Rule fst '%s' does not exist. ", f.c_str());
+        return false;
+      }
+    }
+  }
+
+  if (!rule_fars.empty()) {
+    std::vector<std::string> files;
+    SplitStringToVector(rule_fars, ",", false, &files);
+    for (const auto &f : files) {
+      if (!FileExists(f)) {
+        SHERPA_ONNX_LOGE("Rule far '%s' does not exist. ", f.c_str());
+        return false;
+      }
+    }
+  }
+
   return model_config.Validate();
 }
 
@@ -141,8 +187,12 @@ std::string OnlineRecognizerConfig::ToString() const {
   os << "max_active_paths=" << max_active_paths << ", ";
   os << "hotwords_score=" << hotwords_score << ", ";
   os << "hotwords_file=\"" << hotwords_file << "\", ";
+  os << "tokenize_hotwords=" << (tokenize_hotwords ? "True" : "False") << ", ";
   os << "decoding_method=\"" << decoding_method << "\", ";
-  os << "blank_penalty=" << blank_penalty << ")";
+  os << "blank_penalty=" << blank_penalty << ", ";
+  os << "temperature_scale=" << temperature_scale << ", ";
+  os << "rule_fsts=\"" << rule_fsts << "\", ";
+  os << "rule_fars=\"" << rule_fars << "\")";
 
   return os.str();
 }
