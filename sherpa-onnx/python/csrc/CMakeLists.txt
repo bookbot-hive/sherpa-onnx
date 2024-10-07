@@ -3,6 +3,7 @@ include_directories(${CMAKE_SOURCE_DIR})
 set(srcs
   audio-tagging.cc
   circular-buffer.cc
+  cuda-config.cc
   display.cc
   endpoint.cc
   features.cc
@@ -14,6 +15,7 @@ set(srcs
   offline-paraformer-model-config.cc
   offline-punctuation.cc
   offline-recognizer.cc
+  offline-sense-voice-model-config.cc
   offline-stream.cc
   offline-tdnn-model-config.cc
   offline-transducer-model-config.cc
@@ -23,17 +25,21 @@ set(srcs
   online-ctc-fst-decoder-config.cc
   online-lm-config.cc
   online-model-config.cc
+  online-nemo-ctc-model-config.cc
   online-paraformer-model-config.cc
+  online-punctuation.cc
   online-recognizer.cc
   online-stream.cc
   online-transducer-model-config.cc
   online-wenet-ctc-model-config.cc
   online-zipformer2-ctc-model-config.cc
+  provider-config.cc
   sherpa-onnx.cc
   silero-vad-model-config.cc
   speaker-embedding-extractor.cc
   speaker-embedding-manager.cc
   spoken-language-identification.cc
+  tensorrt-config.cc
   vad-model-config.cc
   vad-model.cc
   voice-activity-detector.cc
@@ -53,6 +59,12 @@ if(SHERPA_ONNX_ENABLE_TTS)
   )
 endif()
 
+if(SHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION)
+  list(APPEND srcs
+    fast-clustering.cc
+  )
+endif()
+
 pybind11_add_module(_sherpa_onnx ${srcs})
 
 if(APPLE)
@@ -62,7 +74,11 @@ if(APPLE)
     OUTPUT_VARIABLE PYTHON_SITE_PACKAGE_DIR
   )
   message(STATUS "PYTHON_SITE_PACKAGE_DIR: ${PYTHON_SITE_PACKAGE_DIR}")
-  target_link_libraries(_sherpa_onnx PRIVATE "-Wl,-rpath,${PYTHON_SITE_PACKAGE_DIR}")
+  if(PYTHON_SITE_PACKAGE_DIR STREQUAL "")
+    message(WARNING "PYTHON_SITE_PACKAGE_DIR is empty!")
+  else()
+    target_link_libraries(_sherpa_onnx PRIVATE "-Wl,-rpath,${PYTHON_SITE_PACKAGE_DIR}")
+  endif()
 endif()
 
 if(NOT WIN32)

@@ -87,6 +87,10 @@ type OnlineModelConfig struct {
 	Provider      string // Optional. Valid values are: cpu, cuda, coreml
 	Debug         int    // 1 to show model meta information while loading it.
 	ModelType     string // Optional. You can specify it for faster model initialization
+	ModelingUnit  string // Optional. cjkchar, bpe, cjkchar+bpe
+	BpeVocab      string // Optional.
+	TokensBuf     string // Optional.
+	TokensBufSize int    // Optional.
 }
 
 // Configuration for the feature extractor
@@ -125,7 +129,14 @@ type OnlineRecognizerConfig struct {
 	Rule1MinTrailingSilence float32
 	Rule2MinTrailingSilence float32
 	Rule3MinUtteranceLength float32
+	HotwordsFile            string
+	HotwordsScore           float32
+	BlankPenalty            float32
 	CtcFstDecoderConfig     OnlineCtcFstDecoderConfig
+	RuleFsts                string
+	RuleFars                string
+	HotwordsBuf             string
+	HotwordsBufSize         int
 }
 
 // It contains the recognition result for a online stream.
@@ -145,7 +156,7 @@ type OnlineStream struct {
 
 // Free the internal pointer inside the recognizer to avoid memory leak.
 func DeleteOnlineRecognizer(recognizer *OnlineRecognizer) {
-	C.DestroyOnlineRecognizer(recognizer.impl)
+	C.SherpaOnnxDestroyOnlineRecognizer(recognizer.impl)
 	recognizer.impl = nil
 }
 
@@ -177,6 +188,11 @@ func NewOnlineRecognizer(config *OnlineRecognizerConfig) *OnlineRecognizer {
 	c.model_config.tokens = C.CString(config.ModelConfig.Tokens)
 	defer C.free(unsafe.Pointer(c.model_config.tokens))
 
+	c.model_config.tokens_buf = C.CString(config.ModelConfig.TokensBuf)
+	defer C.free(unsafe.Pointer(c.model_config.tokens_buf))
+
+	c.model_config.tokens_buf_size = C.int(config.ModelConfig.TokensBufSize)
+
 	c.model_config.num_threads = C.int(config.ModelConfig.NumThreads)
 
 	c.model_config.provider = C.CString(config.ModelConfig.Provider)
@@ -187,6 +203,12 @@ func NewOnlineRecognizer(config *OnlineRecognizerConfig) *OnlineRecognizer {
 	c.model_config.model_type = C.CString(config.ModelConfig.ModelType)
 	defer C.free(unsafe.Pointer(c.model_config.model_type))
 
+	c.model_config.modeling_unit = C.CString(config.ModelConfig.ModelingUnit)
+	defer C.free(unsafe.Pointer(c.model_config.modeling_unit))
+
+	c.model_config.bpe_vocab = C.CString(config.ModelConfig.BpeVocab)
+	defer C.free(unsafe.Pointer(c.model_config.bpe_vocab))
+
 	c.decoding_method = C.CString(config.DecodingMethod)
 	defer C.free(unsafe.Pointer(c.decoding_method))
 
@@ -196,19 +218,36 @@ func NewOnlineRecognizer(config *OnlineRecognizerConfig) *OnlineRecognizer {
 	c.rule2_min_trailing_silence = C.float(config.Rule2MinTrailingSilence)
 	c.rule3_min_utterance_length = C.float(config.Rule3MinUtteranceLength)
 
+	c.hotwords_file = C.CString(config.HotwordsFile)
+	defer C.free(unsafe.Pointer(c.hotwords_file))
+
+	c.hotwords_buf = C.CString(config.HotwordsBuf)
+	defer C.free(unsafe.Pointer(c.hotwords_buf))
+
+	c.hotwords_buf_size = C.int(config.HotwordsBufSize)
+
+	c.hotwords_score = C.float(config.HotwordsScore)
+	c.blank_penalty = C.float(config.BlankPenalty)
+
+	c.rule_fsts = C.CString(config.RuleFsts)
+	defer C.free(unsafe.Pointer(c.rule_fsts))
+
+	c.rule_fars = C.CString(config.RuleFars)
+	defer C.free(unsafe.Pointer(c.rule_fars))
+
 	c.ctc_fst_decoder_config.graph = C.CString(config.CtcFstDecoderConfig.Graph)
 	defer C.free(unsafe.Pointer(c.ctc_fst_decoder_config.graph))
 	c.ctc_fst_decoder_config.max_active = C.int(config.CtcFstDecoderConfig.MaxActive)
 
 	recognizer := &OnlineRecognizer{}
-	recognizer.impl = C.CreateOnlineRecognizer(&c)
+	recognizer.impl = C.SherpaOnnxCreateOnlineRecognizer(&c)
 
 	return recognizer
 }
 
 // Delete the internal pointer inside the stream to avoid memory leak.
 func DeleteOnlineStream(stream *OnlineStream) {
-	C.DestroyOnlineStream(stream.impl)
+	C.SherpaOnnxDestroyOnlineStream(stream.impl)
 	stream.impl = nil
 }
 
@@ -216,7 +255,7 @@ func DeleteOnlineStream(stream *OnlineStream) {
 // the returned stream to avoid memory leak
 func NewOnlineStream(recognizer *OnlineRecognizer) *OnlineStream {
 	stream := &OnlineStream{}
-	stream.impl = C.CreateOnlineStream(recognizer.impl)
+	stream.impl = C.SherpaOnnxCreateOnlineStream(recognizer.impl)
 	return stream
 }
 
@@ -228,7 +267,7 @@ func NewOnlineStream(recognizer *OnlineRecognizer) *OnlineStream {
 //
 // samples contains audio samples. Each sample is in the range [-1, 1]
 func (s *OnlineStream) AcceptWaveform(sampleRate int, samples []float32) {
-	C.AcceptWaveform(s.impl, C.int(sampleRate), (*C.float)(&samples[0]), C.int(len(samples)))
+	C.SherpaOnnxOnlineStreamAcceptWaveform(s.impl, C.int(sampleRate), (*C.float)(&samples[0]), C.int(len(samples)))
 }
 
 // Signal that there will be no incoming audio samples.
@@ -237,7 +276,7 @@ func (s *OnlineStream) AcceptWaveform(sampleRate int, samples []float32) {
 // The main purpose of this function is to flush the remaining audio samples
 // buffered inside for feature extraction.
 func (s *OnlineStream) InputFinished() {
-	C.InputFinished(s.impl)
+	C.SherpaOnnxOnlineStreamInputFinished(s.impl)
 }
 
 // Check whether the stream has enough feature frames for decoding.
@@ -249,7 +288,7 @@ func (s *OnlineStream) InputFinished() {
 //	   recognizer.Decode(s)
 //	}
 func (recognizer *OnlineRecognizer) IsReady(s *OnlineStream) bool {
-	return C.IsOnlineStreamReady(recognizer.impl, s.impl) == 1
+	return C.SherpaOnnxIsOnlineStreamReady(recognizer.impl, s.impl) == 1
 }
 
 // Return true if an endpoint is detected.
@@ -262,14 +301,14 @@ func (recognizer *OnlineRecognizer) IsReady(s *OnlineStream) bool {
 //	   recognizer.Reset(s)
 //	}
 func (recognizer *OnlineRecognizer) IsEndpoint(s *OnlineStream) bool {
-	return C.IsEndpoint(recognizer.impl, s.impl) == 1
+	return C.SherpaOnnxOnlineStreamIsEndpoint(recognizer.impl, s.impl) == 1
 }
 
 // After calling this function, the internal neural network model states
 // are reset and IsEndpoint(s) would return false. GetResult(s) would also
 // return an empty string.
 func (recognizer *OnlineRecognizer) Reset(s *OnlineStream) {
-	C.Reset(recognizer.impl, s.impl)
+	C.SherpaOnnxOnlineStreamReset(recognizer.impl, s.impl)
 }
 
 // Decode the stream. Before calling this function, you have to ensure
@@ -281,7 +320,7 @@ func (recognizer *OnlineRecognizer) Reset(s *OnlineStream) {
 //	  recognizer.Decode(s)
 //	}
 func (recognizer *OnlineRecognizer) Decode(s *OnlineStream) {
-	C.DecodeOnlineStream(recognizer.impl, s.impl)
+	C.SherpaOnnxDecodeOnlineStream(recognizer.impl, s.impl)
 }
 
 // Decode multiple streams in parallel, i.e., in batch.
@@ -293,13 +332,13 @@ func (recognizer *OnlineRecognizer) DecodeStreams(s []*OnlineStream) {
 		ss[i] = v.impl
 	}
 
-	C.DecodeMultipleOnlineStreams(recognizer.impl, &ss[0], C.int(len(s)))
+	C.SherpaOnnxDecodeMultipleOnlineStreams(recognizer.impl, &ss[0], C.int(len(s)))
 }
 
 // Get the current result of stream since the last invoke of Reset()
 func (recognizer *OnlineRecognizer) GetResult(s *OnlineStream) *OnlineRecognizerResult {
-	p := C.GetOnlineStreamResult(recognizer.impl, s.impl)
-	defer C.DestroyOnlineRecognizerResult(p)
+	p := C.SherpaOnnxGetOnlineStreamResult(recognizer.impl, s.impl)
+	defer C.SherpaOnnxDestroyOnlineRecognizerResult(p)
 	result := &OnlineRecognizerResult{}
 	result.Text = C.GoString(p.text)
 
@@ -336,14 +375,21 @@ type OfflineNemoEncDecCtcModelConfig struct {
 }
 
 type OfflineWhisperModelConfig struct {
-	Encoder  string
-	Decoder  string
-	Language string
-	Task     string
+	Encoder      string
+	Decoder      string
+	Language     string
+	Task         string
+	TailPaddings int
 }
 
 type OfflineTdnnModelConfig struct {
 	Model string
+}
+
+type OfflineSenseVoiceModelConfig struct {
+	Model                       string
+	Language                    string
+	UseInverseTextNormalization int
 }
 
 // Configuration for offline LM.
@@ -358,6 +404,7 @@ type OfflineModelConfig struct {
 	NemoCTC    OfflineNemoEncDecCtcModelConfig
 	Whisper    OfflineWhisperModelConfig
 	Tdnn       OfflineTdnnModelConfig
+	SenseVoice OfflineSenseVoiceModelConfig
 	Tokens     string // Path to tokens.txt
 
 	// Number of threads to use for neural network computation
@@ -371,6 +418,10 @@ type OfflineModelConfig struct {
 
 	// Optional. Specify it for faster model initialization.
 	ModelType string
+
+	ModelingUnit  string // Optional. cjkchar, bpe, cjkchar+bpe
+	BpeVocab      string // Optional.
+	TeleSpeechCtc string // Optional.
 }
 
 // Configuration for the offline/non-streaming recognizer.
@@ -384,6 +435,11 @@ type OfflineRecognizerConfig struct {
 
 	// Used only when DecodingMethod is modified_beam_search.
 	MaxActivePaths int
+	HotwordsFile   string
+	HotwordsScore  float32
+	BlankPenalty   float32
+	RuleFsts       string
+	RuleFars       string
 }
 
 // It wraps a pointer from C
@@ -398,12 +454,17 @@ type OfflineStream struct {
 
 // It contains recognition result of an offline stream.
 type OfflineRecognizerResult struct {
-	Text string
+	Text       string
+	Tokens     []string
+	Timestamps []float32
+	Lang       string
+	Emotion    string
+	Event      string
 }
 
 // Frees the internal pointer of the recognition to avoid memory leak.
 func DeleteOfflineRecognizer(recognizer *OfflineRecognizer) {
-	C.DestroyOfflineRecognizer(recognizer.impl)
+	C.SherpaOnnxDestroyOfflineRecognizer(recognizer.impl)
 	recognizer.impl = nil
 }
 
@@ -441,8 +502,18 @@ func NewOfflineRecognizer(config *OfflineRecognizerConfig) *OfflineRecognizer {
 	c.model_config.whisper.task = C.CString(config.ModelConfig.Whisper.Task)
 	defer C.free(unsafe.Pointer(c.model_config.whisper.task))
 
+	c.model_config.whisper.tail_paddings = C.int(config.ModelConfig.Whisper.TailPaddings)
+
 	c.model_config.tdnn.model = C.CString(config.ModelConfig.Tdnn.Model)
 	defer C.free(unsafe.Pointer(c.model_config.tdnn.model))
+
+	c.model_config.sense_voice.model = C.CString(config.ModelConfig.SenseVoice.Model)
+	defer C.free(unsafe.Pointer(c.model_config.sense_voice.model))
+
+	c.model_config.sense_voice.language = C.CString(config.ModelConfig.SenseVoice.Language)
+	defer C.free(unsafe.Pointer(c.model_config.sense_voice.language))
+
+	c.model_config.sense_voice.use_itn = C.int(config.ModelConfig.SenseVoice.UseInverseTextNormalization)
 
 	c.model_config.tokens = C.CString(config.ModelConfig.Tokens)
 	defer C.free(unsafe.Pointer(c.model_config.tokens))
@@ -457,6 +528,15 @@ func NewOfflineRecognizer(config *OfflineRecognizerConfig) *OfflineRecognizer {
 	c.model_config.model_type = C.CString(config.ModelConfig.ModelType)
 	defer C.free(unsafe.Pointer(c.model_config.model_type))
 
+	c.model_config.modeling_unit = C.CString(config.ModelConfig.ModelingUnit)
+	defer C.free(unsafe.Pointer(c.model_config.modeling_unit))
+
+	c.model_config.bpe_vocab = C.CString(config.ModelConfig.BpeVocab)
+	defer C.free(unsafe.Pointer(c.model_config.bpe_vocab))
+
+	c.model_config.telespeech_ctc = C.CString(config.ModelConfig.TeleSpeechCtc)
+	defer C.free(unsafe.Pointer(c.model_config.telespeech_ctc))
+
 	c.lm_config.model = C.CString(config.LmConfig.Model)
 	defer C.free(unsafe.Pointer(c.lm_config.model))
 
@@ -467,15 +547,28 @@ func NewOfflineRecognizer(config *OfflineRecognizerConfig) *OfflineRecognizer {
 
 	c.max_active_paths = C.int(config.MaxActivePaths)
 
+	c.hotwords_file = C.CString(config.HotwordsFile)
+	defer C.free(unsafe.Pointer(c.hotwords_file))
+
+	c.hotwords_score = C.float(config.HotwordsScore)
+
+	c.blank_penalty = C.float(config.BlankPenalty)
+
+	c.rule_fsts = C.CString(config.RuleFsts)
+	defer C.free(unsafe.Pointer(c.rule_fsts))
+
+	c.rule_fars = C.CString(config.RuleFars)
+	defer C.free(unsafe.Pointer(c.rule_fars))
+
 	recognizer := &OfflineRecognizer{}
-	recognizer.impl = C.CreateOfflineRecognizer(&c)
+	recognizer.impl = C.SherpaOnnxCreateOfflineRecognizer(&c)
 
 	return recognizer
 }
 
 // Frees the internal pointer of the stream to avoid memory leak.
 func DeleteOfflineStream(stream *OfflineStream) {
-	C.DestroyOfflineStream(stream.impl)
+	C.SherpaOnnxDestroyOfflineStream(stream.impl)
 	stream.impl = nil
 }
 
@@ -483,7 +576,7 @@ func DeleteOfflineStream(stream *OfflineStream) {
 // the returned stream to avoid memory leak
 func NewOfflineStream(recognizer *OfflineRecognizer) *OfflineStream {
 	stream := &OfflineStream{}
-	stream.impl = C.CreateOfflineStream(recognizer.impl)
+	stream.impl = C.SherpaOnnxCreateOfflineStream(recognizer.impl)
 	return stream
 }
 
@@ -495,12 +588,12 @@ func NewOfflineStream(recognizer *OfflineRecognizer) *OfflineStream {
 //
 // samples contains the actual audio samples. Each sample is in the range [-1, 1].
 func (s *OfflineStream) AcceptWaveform(sampleRate int, samples []float32) {
-	C.AcceptWaveformOffline(s.impl, C.int(sampleRate), (*C.float)(&samples[0]), C.int(len(samples)))
+	C.SherpaOnnxAcceptWaveformOffline(s.impl, C.int(sampleRate), (*C.float)(&samples[0]), C.int(len(samples)))
 }
 
 // Decode the offline stream.
 func (recognizer *OfflineRecognizer) Decode(s *OfflineStream) {
-	C.DecodeOfflineStream(recognizer.impl, s.impl)
+	C.SherpaOnnxDecodeOfflineStream(recognizer.impl, s.impl)
 }
 
 // Decode multiple streams in parallel, i.e., in batch.
@@ -510,16 +603,35 @@ func (recognizer *OfflineRecognizer) DecodeStreams(s []*OfflineStream) {
 		ss[i] = v.impl
 	}
 
-	C.DecodeMultipleOfflineStreams(recognizer.impl, &ss[0], C.int(len(s)))
+	C.SherpaOnnxDecodeMultipleOfflineStreams(recognizer.impl, &ss[0], C.int(len(s)))
 }
 
 // Get the recognition result of the offline stream.
 func (s *OfflineStream) GetResult() *OfflineRecognizerResult {
-	p := C.GetOfflineStreamResult(s.impl)
-	defer C.DestroyOfflineRecognizerResult(p)
+	p := C.SherpaOnnxGetOfflineStreamResult(s.impl)
+	defer C.SherpaOnnxDestroyOfflineRecognizerResult(p)
+	n := int(p.count)
+	if n == 0 {
+		return nil
+	}
 	result := &OfflineRecognizerResult{}
 	result.Text = C.GoString(p.text)
-
+	result.Lang = C.GoString(p.lang)
+	result.Emotion = C.GoString(p.emotion)
+	result.Event = C.GoString(p.event)
+	result.Tokens = make([]string, n)
+	tokens := (*[1 << 28]*C.char)(unsafe.Pointer(p.tokens_arr))[:n:n]
+	for i := 0; i < n; i++ {
+		result.Tokens[i] = C.GoString(tokens[i])
+	}
+	if p.timestamps == nil {
+		return result
+	}
+	result.Timestamps = make([]float32, n)
+	timestamps := (*[1 << 28]C.float)(unsafe.Pointer(p.timestamps))[:n:n]
+	for i := 0; i < n; i++ {
+		result.Timestamps[i] = float32(timestamps[i])
+	}
 	return result
 }
 
@@ -532,10 +644,11 @@ type OfflineTtsVitsModelConfig struct {
 	Model       string  // Path to the VITS onnx model
 	Lexicon     string  // Path to lexicon.txt
 	Tokens      string  // Path to tokens.txt
-	DataDir     string  // Path to tokens.txt
+	DataDir     string  // Path to espeak-ng-data directory
 	NoiseScale  float32 // noise scale for vits models. Please use 0.667 in general
 	NoiseScaleW float32 // noise scale for vits models. Please use 0.8 in general
 	LengthScale float32 // Please use 1.0 in general. Smaller -> Faster speech speed. Larger -> Slower speech speed
+	DictDir     string  // Path to dict directory for jieba (used only in Chinese tts)
 }
 
 type OfflineTtsModelConfig struct {
@@ -605,6 +718,9 @@ func NewOfflineTts(config *OfflineTtsConfig) *OfflineTts {
 	c.model.vits.noise_scale_w = C.float(config.Model.Vits.NoiseScaleW)
 	c.model.vits.length_scale = C.float(config.Model.Vits.LengthScale)
 
+	c.model.vits.dict_dir = C.CString(config.Model.Vits.DictDir)
+	defer C.free(unsafe.Pointer(c.model.vits.dict_dir))
+
 	c.model.num_threads = C.int(config.Model.NumThreads)
 	c.model.debug = C.int(config.Model.Debug)
 
@@ -658,6 +774,7 @@ type SileroVadModelConfig struct {
 	MinSilenceDuration float32
 	MinSpeechDuration  float32
 	WindowSize         int
+	MaxSpeechDuration  float32
 }
 
 type VadModelConfig struct {
@@ -736,6 +853,7 @@ func NewVoiceActivityDetector(config *VadModelConfig, bufferSizeInSeconds float3
 	c.silero_vad.min_silence_duration = C.float(config.SileroVad.MinSilenceDuration)
 	c.silero_vad.min_speech_duration = C.float(config.SileroVad.MinSpeechDuration)
 	c.silero_vad.window_size = C.int(config.SileroVad.WindowSize)
+	c.silero_vad.max_speech_duration = C.float(config.SileroVad.MaxSpeechDuration)
 
 	c.sample_rate = C.int(config.SampleRate)
 	c.num_threads = C.int(config.NumThreads)
@@ -796,6 +914,10 @@ func (vad *VoiceActivityDetector) Front() *SpeechSegment {
 
 func (vad *VoiceActivityDetector) Reset() {
 	C.SherpaOnnxVoiceActivityDetectorReset(vad.impl)
+}
+
+func (vad *VoiceActivityDetector) Flush() {
+	C.SherpaOnnxVoiceActivityDetectorFlush(vad.impl)
 }
 
 // Spoken language identification

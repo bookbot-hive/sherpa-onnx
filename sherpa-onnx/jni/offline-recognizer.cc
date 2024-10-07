@@ -34,6 +34,21 @@ static OfflineRecognizerConfig GetOfflineConfig(JNIEnv *env, jobject config) {
   fid = env->GetFieldID(cls, "hotwordsScore", "F");
   ans.hotwords_score = env->GetFloatField(config, fid);
 
+  fid = env->GetFieldID(cls, "ruleFsts", "Ljava/lang/String;");
+  s = (jstring)env->GetObjectField(config, fid);
+  p = env->GetStringUTFChars(s, nullptr);
+  ans.rule_fsts = p;
+  env->ReleaseStringUTFChars(s, p);
+
+  fid = env->GetFieldID(cls, "ruleFars", "Ljava/lang/String;");
+  s = (jstring)env->GetObjectField(config, fid);
+  p = env->GetStringUTFChars(s, nullptr);
+  ans.rule_fars = p;
+  env->ReleaseStringUTFChars(s, p);
+
+  fid = env->GetFieldID(cls, "blankPenalty", "F");
+  ans.blank_penalty = env->GetFloatField(config, fid);
+
   //---------- feat config ----------
   fid = env->GetFieldID(cls, "featConfig",
                         "Lcom/k2fsa/sherpa/onnx/FeatureConfig;");
@@ -74,6 +89,18 @@ static OfflineRecognizerConfig GetOfflineConfig(JNIEnv *env, jobject config) {
   s = (jstring)env->GetObjectField(model_config, fid);
   p = env->GetStringUTFChars(s, nullptr);
   ans.model_config.model_type = p;
+  env->ReleaseStringUTFChars(s, p);
+
+  fid = env->GetFieldID(model_config_cls, "modelingUnit", "Ljava/lang/String;");
+  s = (jstring)env->GetObjectField(model_config, fid);
+  p = env->GetStringUTFChars(s, nullptr);
+  ans.model_config.modeling_unit = p;
+  env->ReleaseStringUTFChars(s, p);
+
+  fid = env->GetFieldID(model_config_cls, "bpeVocab", "Ljava/lang/String;");
+  s = (jstring)env->GetObjectField(model_config, fid);
+  p = env->GetStringUTFChars(s, nullptr);
+  ans.model_config.bpe_vocab = p;
   env->ReleaseStringUTFChars(s, p);
 
   // transducer
@@ -147,6 +174,50 @@ static OfflineRecognizerConfig GetOfflineConfig(JNIEnv *env, jobject config) {
   ans.model_config.whisper.tail_paddings =
       env->GetIntField(whisper_config, fid);
 
+  // sense voice
+  fid = env->GetFieldID(model_config_cls, "senseVoice",
+                        "Lcom/k2fsa/sherpa/onnx/OfflineSenseVoiceModelConfig;");
+  jobject sense_voice_config = env->GetObjectField(model_config, fid);
+  jclass sense_voice_config_cls = env->GetObjectClass(sense_voice_config);
+
+  fid = env->GetFieldID(sense_voice_config_cls, "model", "Ljava/lang/String;");
+  s = (jstring)env->GetObjectField(sense_voice_config, fid);
+  p = env->GetStringUTFChars(s, nullptr);
+  ans.model_config.sense_voice.model = p;
+  env->ReleaseStringUTFChars(s, p);
+
+  fid =
+      env->GetFieldID(sense_voice_config_cls, "language", "Ljava/lang/String;");
+  s = (jstring)env->GetObjectField(sense_voice_config, fid);
+  p = env->GetStringUTFChars(s, nullptr);
+  ans.model_config.sense_voice.language = p;
+  env->ReleaseStringUTFChars(s, p);
+
+  fid = env->GetFieldID(sense_voice_config_cls, "useInverseTextNormalization",
+                        "Z");
+  ans.model_config.sense_voice.use_itn =
+      env->GetBooleanField(sense_voice_config, fid);
+
+  // nemo
+  fid = env->GetFieldID(
+      model_config_cls, "nemo",
+      "Lcom/k2fsa/sherpa/onnx/OfflineNemoEncDecCtcModelConfig;");
+  jobject nemo_config = env->GetObjectField(model_config, fid);
+  jclass nemo_config_cls = env->GetObjectClass(nemo_config);
+
+  fid = env->GetFieldID(nemo_config_cls, "model", "Ljava/lang/String;");
+
+  s = (jstring)env->GetObjectField(nemo_config, fid);
+  p = env->GetStringUTFChars(s, nullptr);
+  ans.model_config.nemo_ctc.model = p;
+  env->ReleaseStringUTFChars(s, p);
+
+  fid = env->GetFieldID(model_config_cls, "teleSpeech", "Ljava/lang/String;");
+  s = (jstring)env->GetObjectField(model_config, fid);
+  p = env->GetStringUTFChars(s, nullptr);
+  ans.model_config.telespeech_ctc = p;
+  env->ReleaseStringUTFChars(s, p);
+
   return ans;
 }
 
@@ -194,14 +265,24 @@ Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_newFromFile(JNIEnv *env,
 }
 
 SHERPA_ONNX_EXTERN_C
+JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_setConfig(
+    JNIEnv *env, jobject /*obj*/, jlong ptr, jobject _config) {
+  auto config = sherpa_onnx::GetOfflineConfig(env, _config);
+  SHERPA_ONNX_LOGE("config:\n%s", config.ToString().c_str());
+
+  auto recognizer = reinterpret_cast<sherpa_onnx::OfflineRecognizer *>(ptr);
+  recognizer->SetConfig(config);
+}
+
+SHERPA_ONNX_EXTERN_C
 JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_delete(
-    JNIEnv *env, jobject /*obj*/, jlong ptr) {
+    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr) {
   delete reinterpret_cast<sherpa_onnx::OfflineRecognizer *>(ptr);
 }
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT jlong JNICALL
-Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_createStream(JNIEnv *env,
+Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_createStream(JNIEnv * /*env*/,
                                                           jobject /*obj*/,
                                                           jlong ptr) {
   auto recognizer = reinterpret_cast<sherpa_onnx::OfflineRecognizer *>(ptr);
@@ -217,7 +298,7 @@ Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_createStream(JNIEnv *env,
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_decode(
-    JNIEnv *env, jobject /*obj*/, jlong ptr, jlong streamPtr) {
+    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr, jlong streamPtr) {
   auto recognizer = reinterpret_cast<sherpa_onnx::OfflineRecognizer *>(ptr);
   auto stream = reinterpret_cast<sherpa_onnx::OfflineStream *>(streamPtr);
 
@@ -235,8 +316,11 @@ Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_getResult(JNIEnv *env,
   // [0]: text, jstring
   // [1]: tokens, array of jstring
   // [2]: timestamps, array of float
+  // [3]: lang, jstring
+  // [4]: emotion, jstring
+  // [5]: event, jstring
   jobjectArray obj_arr = (jobjectArray)env->NewObjectArray(
-      3, env->FindClass("java/lang/Object"), nullptr);
+      6, env->FindClass("java/lang/Object"), nullptr);
 
   jstring text = env->NewStringUTF(result.text.c_str());
   env->SetObjectArrayElement(obj_arr, 0, text);
@@ -258,6 +342,16 @@ Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_getResult(JNIEnv *env,
                            result.timestamps.data());
 
   env->SetObjectArrayElement(obj_arr, 2, timestamps_arr);
+
+  // [3]: lang, jstring
+  // [4]: emotion, jstring
+  // [5]: event, jstring
+  env->SetObjectArrayElement(obj_arr, 3,
+                             env->NewStringUTF(result.lang.c_str()));
+  env->SetObjectArrayElement(obj_arr, 4,
+                             env->NewStringUTF(result.emotion.c_str()));
+  env->SetObjectArrayElement(obj_arr, 5,
+                             env->NewStringUTF(result.event.c_str()));
 
   return obj_arr;
 }

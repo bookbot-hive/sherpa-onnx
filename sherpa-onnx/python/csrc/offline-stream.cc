@@ -25,30 +25,28 @@ Args:
 static void PybindOfflineRecognitionResult(py::module *m) {  // NOLINT
   using PyClass = OfflineRecognitionResult;
   py::class_<PyClass>(*m, "OfflineRecognitionResult")
+      .def("__str__", &PyClass::AsJsonString)
       .def_property_readonly(
           "text",
           [](const PyClass &self) -> py::str {
             return py::str(PyUnicode_DecodeUTF8(self.text.c_str(),
                                                 self.text.size(), "ignore"));
           })
+      .def_property_readonly("lang",
+                            [](const PyClass &self) { return self.lang; })
+      .def_property_readonly("emotion",
+                            [](const PyClass &self) { return self.emotion; })
+      .def_property_readonly("event",
+                            [](const PyClass &self) { return self.event; })
       .def_property_readonly("tokens",
                              [](const PyClass &self) { return self.tokens; })
+      .def_property_readonly("words",
+                             [](const PyClass &self) { return self.words; })
       .def_property_readonly(
           "timestamps", [](const PyClass &self) { return self.timestamps; });
 }
 
-static void PybindOfflineFeatureExtractorConfig(py::module *m) {
-  using PyClass = OfflineFeatureExtractorConfig;
-  py::class_<PyClass>(*m, "OfflineFeatureExtractorConfig")
-      .def(py::init<int32_t, int32_t>(), py::arg("sampling_rate") = 16000,
-           py::arg("feature_dim") = 80)
-      .def_readwrite("sampling_rate", &PyClass::sampling_rate)
-      .def_readwrite("feature_dim", &PyClass::feature_dim)
-      .def("__str__", &PyClass::ToString);
-}
-
 void PybindOfflineStream(py::module *m) {
-  PybindOfflineFeatureExtractorConfig(m);
   PybindOfflineRecognitionResult(m);
 
   using PyClass = OfflineStream;

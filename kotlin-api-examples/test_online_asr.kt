@@ -3,6 +3,8 @@ package com.k2fsa.sherpa.onnx
 fun main() {
   testOnlineAsr("transducer")
   testOnlineAsr("zipformer2-ctc")
+  testOnlineAsr("ctc-hlg")
+  testOnlineAsr("nemo-ctc")
 }
 
 fun testOnlineAsr(type: String) {
@@ -11,6 +13,7 @@ fun testOnlineAsr(type: String) {
         featureDim = 80,
     )
 
+    var ctcFstDecoderConfig  = OnlineCtcFstDecoderConfig()
     val waveFilename: String
     val modelConfig: OnlineModelConfig = when (type) {
       "transducer" -> {
@@ -40,6 +43,29 @@ fun testOnlineAsr(type: String) {
             debug = false,
         )
       }
+      "nemo-ctc" -> {
+        waveFilename = "./sherpa-onnx-nemo-streaming-fast-conformer-ctc-en-80ms/test_wavs/0.wav"
+        OnlineModelConfig(
+            neMoCtc = OnlineNeMoCtcModelConfig(
+                model = "./sherpa-onnx-nemo-streaming-fast-conformer-ctc-en-80ms/model.onnx",
+            ),
+            tokens = "./sherpa-onnx-nemo-streaming-fast-conformer-ctc-en-80ms/tokens.txt",
+            numThreads = 1,
+            debug = false,
+        )
+      }
+      "ctc-hlg" -> {
+        waveFilename = "./sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18/test_wavs/1.wav"
+        ctcFstDecoderConfig.graph = "./sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18/HLG.fst"
+        OnlineModelConfig(
+            zipformer2Ctc = OnlineZipformer2CtcModelConfig(
+                model = "./sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18/ctc-epoch-30-avg-3-chunk-16-left-128.int8.onnx",
+            ),
+            tokens = "./sherpa-onnx-streaming-zipformer-ctc-small-2024-03-18/tokens.txt",
+            numThreads = 1,
+            debug = false,
+        )
+      }
       else -> throw IllegalArgumentException(type)
     }
 
@@ -51,6 +77,7 @@ fun testOnlineAsr(type: String) {
         modelConfig = modelConfig,
         lmConfig = lmConfig,
         featConfig = featConfig,
+        ctcFstDecoderConfig=ctcFstDecoderConfig,
         endpointConfig = endpointConfig,
         enableEndpoint = true,
         decodingMethod = "greedy_search",

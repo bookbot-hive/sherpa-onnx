@@ -10,72 +10,120 @@ echo "SHERPA_ONNX_DIR: $SHERPA_ONNX_DIR"
 
 SHERPA_ONNX_VERSION=$(grep "SHERPA_ONNX_VERSION" $SHERPA_ONNX_DIR/CMakeLists.txt  | cut -d " " -f 2  | cut -d '"' -f 2)
 
-# HF_MIRROR=hf-mirror.com
-HF_MIRROR=hf.co
+# You can pre-download the required wheels to $src_dir
 
-mkdir -p /tmp/
-pushd /tmp
+if [ $(hostname) == fangjuns-MacBook-Pro.local ]; then
+  HF_MIRROR=hf-mirror.com
+  src_dir=/Users/fangjun/open-source/sherpa-onnx/scripts/dotnet/tmp
+else
+  src_dir=/tmp
+  HF_MIRROR=hf.co
+fi
+export src_dir
 
-mkdir -p linux macos windows-x64 windows-x86
+mkdir -p $src_dir
+pushd $src_dir
 
-# You can pre-download the required wheels to /tmp
-src_dir=/tmp
+mkdir -p linux-x64 linux-arm64 macos-x64 macos-arm64 windows-x64 windows-x86 windows-arm64
 
-linux_wheel=$src_dir/sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-macos_wheel=$src_dir/sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-macosx_11_0_x86_64.whl
-windows_x64_wheel=$src_dir/sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-win_amd64.whl
-windows_x86_wheel=$src_dir/sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-win32.whl
+linux_x64_wheel_filename=sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+linux_x64_wheel=$src_dir/$linux_x64_wheel_filename
 
-if [ ! -f /tmp/linux/libsherpa-onnx-core.so ]; then
+linux_arm64_wheel_filename=sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl
+linux_arm64_wheel=$src_dir/$linux_arm64_wheel_filename
+
+macos_x64_wheel_filename=sherpa_onnx-${SHERPA_ONNX_VERSION}-cp39-cp39-macosx_11_0_x86_64.whl
+macos_x64_wheel=$src_dir/$macos_x64_wheel_filename
+
+macos_arm64_wheel_filename=sherpa_onnx-${SHERPA_ONNX_VERSION}-cp39-cp39-macosx_11_0_arm64.whl
+macos_arm64_wheel=$src_dir/$macos_arm64_wheel_filename
+
+windows_x64_wheel_filename=sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-win_amd64.whl
+windows_x64_wheel=$src_dir/$windows_x64_wheel_filename
+
+windows_x86_wheel_filename=sherpa-onnx-${SHERPA_ONNX_VERSION}-win-x86.tar.bz2
+windows_x86_wheel=$src_dir/$windows_x86_wheel_filename
+
+windows_arm64_wheel_filename=sherpa-onnx-${SHERPA_ONNX_VERSION}-win-arm64.tar.bz2
+windows_arm64_wheel=$src_dir/$windows_arm64_wheel_filename
+
+if [ ! -f $src_dir/linux-x64/libsherpa-onnx-c-api.so ]; then
   echo "---linux x86_64---"
-  cd linux
+  cd linux-x64
   mkdir -p wheel
   cd wheel
-  if [ -f $linux_wheel ]; then
-    cp -v $linux_wheel .
+  if [ -f $linux_x64_wheel ]; then
+    cp -v $linux_x64_wheel .
   else
-    curl -OL https://$HF_MIRROR/csukuangfj/sherpa-onnx-wheels/resolve/main/sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+    curl -OL https://$HF_MIRROR/csukuangfj/sherpa-onnx-wheels/resolve/main/cpu/$SHERPA_ONNX_VERSION/$linux_x64_wheel_filename
   fi
-  unzip sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+  unzip $linux_x64_wheel_filename
   cp -v sherpa_onnx/lib/*.so* ../
   cd ..
-  rm -v libpiper_phonemize.so libpiper_phonemize.so.1.2.0
-  rm -v libsherpa-onnx-fst.so
-  rm -v libsherpa-onnx-fstfar.so
-  rm -v libonnxruntime.so
-  rm -v libcargs.so
   rm -rf wheel
   ls -lh
   cd ..
 fi
 
-if [ ! -f /tmp/macos/libsherpa-onnx-core.dylib ]; then
-  echo "---macOS x86_64---"
-  cd macos
+if [ ! -f $src_dir/linux-arm64/libsherpa-onnx-c-api.so ]; then
+  echo "---linux arm64---"
+  cd linux-arm64
   mkdir -p wheel
   cd wheel
-  if [ -f $macos_wheel  ]; then
-    cp -v $macos_wheel .
+  if [ -f $linux_arm64_wheel ]; then
+    cp -v $linux_arm64_wheel .
   else
-    curl -OL https://$HF_MIRROR/csukuangfj/sherpa-onnx-wheels/resolve/main/sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-macosx_11_0_x86_64.whl
+    curl -OL https://$HF_MIRROR/csukuangfj/sherpa-onnx-wheels/resolve/main/cpu/$SHERPA_ONNX_VERSION/$linux_arm64_wheel_filename
   fi
-  unzip sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-macosx_11_0_x86_64.whl
+  unzip $linux_arm64_wheel_filename
+  cp -v sherpa_onnx/lib/*.so* ../
+  cd ..
+  rm -rf wheel
+  ls -lh
+  cd ..
+fi
+
+if [ ! -f $src_dir/macos-x64/libsherpa-onnx-c-api.dylib ]; then
+  echo "--- macOS x86_64---"
+  cd macos-x64
+  mkdir -p wheel
+  cd wheel
+  if [ -f $macos_x64_wheel  ]; then
+    cp -v $macos_x64_wheel .
+  else
+    curl -OL https://$HF_MIRROR/csukuangfj/sherpa-onnx-wheels/resolve/main/cpu/$SHERPA_ONNX_VERSION/$macos_x64_wheel_filename
+  fi
+  unzip $macos_x64_wheel_filename
   cp -v sherpa_onnx/lib/*.dylib ../
 
   cd ..
 
-  rm -v libcargs.dylib
-  rm -v libonnxruntime.dylib
-  rm -v libpiper_phonemize.1.2.0.dylib libpiper_phonemize.dylib
-  rm -v libsherpa-onnx-fst.dylib
-  rm -v libsherpa-onnx-fstfar.dylib
   rm -rf wheel
   ls -lh
   cd ..
 fi
 
+if [ ! -f $src_dir/macos-arm64/libsherpa-onnx-c-api.dylib ]; then
+  echo "--- macOS arm64---"
+  cd macos-arm64
+  mkdir -p wheel
+  cd wheel
+  if [ -f $macos_arm64_wheel  ]; then
+    cp -v $macos_arm64_wheel .
+  else
+    curl -OL https://$HF_MIRROR/csukuangfj/sherpa-onnx-wheels/resolve/main/cpu/$SHERPA_ONNX_VERSION/$macos_arm64_wheel_filename
+  fi
+  unzip $macos_arm64_wheel_filename
+  cp -v sherpa_onnx/lib/*.dylib ../
 
-if [ ! -f /tmp/windows-x64/sherpa-onnx-core.dll ]; then
+  cd ..
+
+  rm -rf wheel
+  ls -lh
+  cd ..
+fi
+
+if [ ! -f $src_dir/windows-x64/sherpa-onnx-c-api.dll ]; then
   echo "---windows x64---"
   cd windows-x64
   mkdir -p wheel
@@ -83,11 +131,10 @@ if [ ! -f /tmp/windows-x64/sherpa-onnx-core.dll ]; then
   if [ -f $windows_x64_wheel ]; then
     cp -v $windows_x64_wheel .
   else
-    curl -OL https://$HF_MIRROR/csukuangfj/sherpa-onnx-wheels/resolve/main/sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-win_amd64.whl
+    curl -OL https://$HF_MIRROR/csukuangfj/sherpa-onnx-wheels/resolve/main/cpu/$SHERPA_ONNX_VERSION/$windows_x64_wheel_filename
   fi
-  unzip sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-win_amd64.whl
+  unzip $windows_x64_wheel_filename
   cp -v sherpa_onnx-${SHERPA_ONNX_VERSION}.data/data/bin/*.dll ../
-  cp -v sherpa_onnx-${SHERPA_ONNX_VERSION}.data/data/bin/*.lib ../
   cd ..
 
   rm -rf wheel
@@ -95,7 +142,7 @@ if [ ! -f /tmp/windows-x64/sherpa-onnx-core.dll ]; then
   cd ..
 fi
 
-if [ ! -f /tmp/windows-x86/sherpa-onnx-core.dll ]; then
+if [ ! -f $src_dir/windows-x86/sherpa-onnx-c-api.dll ]; then
   echo "---windows x86---"
   cd windows-x86
   mkdir -p wheel
@@ -103,11 +150,29 @@ if [ ! -f /tmp/windows-x86/sherpa-onnx-core.dll ]; then
   if [ -f $windows_x86_wheel ]; then
     cp -v $windows_x86_wheel .
   else
-    curl -OL https://$HF_MIRROR/csukuangfj/sherpa-onnx-wheels/resolve/main/sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-win32.whl
+    curl -OL https://$HF_MIRROR/csukuangfj/sherpa-onnx-libs/resolve/main/windows-for-dotnet/$windows_x86_wheel_filename
   fi
-  unzip sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-win32.whl
-  cp -v sherpa_onnx-${SHERPA_ONNX_VERSION}.data/data/bin/*.dll ../
-  cp -v sherpa_onnx-${SHERPA_ONNX_VERSION}.data/data/bin/*.lib ../
+  tar xvf $windows_x86_wheel_filename
+  cp -v sherpa-onnx-${SHERPA_ONNX_VERSION}-win-x86/*dll ../
+  cd ..
+
+  rm -rf wheel
+  ls -lh
+  cd ..
+fi
+
+if [ ! -f $src_dir/windows-arm64/sherpa-onnx-c-api.dll ]; then
+  echo "---windows arm64---"
+  cd windows-arm64
+  mkdir -p wheel
+  cd wheel
+  if [ -f $windows_arm64_wheel ]; then
+    cp -v $windows_arm64_wheel .
+  else
+    curl -OL https://$HF_MIRROR/csukuangfj/sherpa-onnx-libs/resolve/main/windows-for-dotnet/$windows_arm64_wheel_filename
+  fi
+  tar xvf $windows_arm64_wheel_filename
+  cp -v sherpa-onnx-${SHERPA_ONNX_VERSION}-win-arm64/*dll ../
   cd ..
 
   rm -rf wheel
@@ -117,19 +182,28 @@ fi
 
 popd
 
-mkdir -p macos linux windows-x64 windows-x86 all
+mkdir -p macos-x64 macos-arm64 linux-x64 linux-arm64 windows-x64 windows-x86 windows-arm64 all
 
-cp ./online.cs all
-cp ./offline.cs all
+cp ./*.cs all
 
 ./generate.py
 
-pushd linux
+pushd linux-x64
 dotnet build -c Release
 dotnet pack -c Release -o ../packages
 popd
 
-pushd macos
+pushd linux-arm64
+dotnet build -c Release
+dotnet pack -c Release -o ../packages
+popd
+
+pushd macos-x64
+dotnet build -c Release
+dotnet pack -c Release -o ../packages
+popd
+
+pushd macos-arm64
 dotnet build -c Release
 dotnet pack -c Release -o ../packages
 popd
@@ -140,6 +214,11 @@ dotnet pack -c Release -o ../packages
 popd
 
 pushd windows-x86
+dotnet build -c Release
+dotnet pack -c Release -o ../packages
+popd
+
+pushd windows-arm64
 dotnet build -c Release
 dotnet pack -c Release -o ../packages
 popd

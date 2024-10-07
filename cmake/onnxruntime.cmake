@@ -87,10 +87,18 @@ function(download_onnxruntime)
       if(SHERPA_ONNX_ENABLE_GPU)
         message(FATAL_ERROR "GPU support for Win32 is not supported!")
       endif()
+    elseif(CMAKE_VS_PLATFORM_NAME STREQUAL ARM64 OR CMAKE_VS_PLATFORM_NAME STREQUAL arm64)
+      # for 64-bit windows (arm64)
+      if(NOT BUILD_SHARED_LIBS)
+        message(FATAL_ERROR "Please pass -DBUILD_SHARED_LIBS=ON to cmake")
+      endif()
+      include(onnxruntime-win-arm64)
     else()
-      # for 64-bit windows
-
-      if(BUILD_SHARED_LIBS)
+      # for 64-bit windows (x64)
+      if(SHERPA_ONNX_ENABLE_DIRECTML)
+        message(STATUS "Use DirectML")
+        include(onnxruntime-win-x64-directml)
+      elseif(BUILD_SHARED_LIBS)
         message(STATUS "Use dynamic onnxruntime libraries")
         if(SHERPA_ONNX_ENABLE_GPU)
           include(onnxruntime-win-x64-gpu)
@@ -131,8 +139,8 @@ if(SHERPA_ONNX_USE_PRE_INSTALLED_ONNXRUNTIME_IF_AVAILABLE)
   else()
     find_path(location_onnxruntime_header_dir onnxruntime_cxx_api.h
       PATHS
-        /usr/include
-        /usr/local/include
+        /usr/include/onnxruntime
+        /usr/local/include/onnxruntime
     )
   endif()
 

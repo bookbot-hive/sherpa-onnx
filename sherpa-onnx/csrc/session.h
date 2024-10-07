@@ -5,11 +5,14 @@
 #ifndef SHERPA_ONNX_CSRC_SESSION_H_
 #define SHERPA_ONNX_CSRC_SESSION_H_
 
+#include <string>
+
 #include "onnxruntime_cxx_api.h"  // NOLINT
 #include "sherpa-onnx/csrc/audio-tagging-model-config.h"
 #include "sherpa-onnx/csrc/offline-lm-config.h"
 #include "sherpa-onnx/csrc/offline-model-config.h"
 #include "sherpa-onnx/csrc/offline-punctuation-model-config.h"
+#include "sherpa-onnx/csrc/online-punctuation-model-config.h"
 #include "sherpa-onnx/csrc/online-lm-config.h"
 #include "sherpa-onnx/csrc/online-model-config.h"
 #include "sherpa-onnx/csrc/speaker-embedding-extractor.h"
@@ -23,6 +26,9 @@
 namespace sherpa_onnx {
 
 Ort::SessionOptions GetSessionOptions(const OnlineModelConfig &config);
+
+Ort::SessionOptions GetSessionOptions(const OnlineModelConfig &config,
+                                      const std::string &model_type);
 
 Ort::SessionOptions GetSessionOptions(const OfflineModelConfig &config);
 
@@ -46,6 +52,9 @@ Ort::SessionOptions GetSessionOptions(const AudioTaggingModelConfig &config);
 
 Ort::SessionOptions GetSessionOptions(
     const OfflinePunctuationModelConfig &config);
+
+Ort::SessionOptions GetSessionOptions(
+    const OnlinePunctuationModelConfig &config);
 
 }  // namespace sherpa_onnx
 

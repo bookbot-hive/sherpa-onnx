@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "sherpa-onnx/csrc/symbol-table.h"
+#include "ssentencepiece/csrc/ssentencepiece.h"
 
 namespace sherpa_onnx {
 
@@ -25,8 +26,11 @@ namespace sherpa_onnx {
  * @return  If all the symbols from ``is`` are in the symbol_table, returns true
  *          otherwise returns false.
  */
-bool EncodeHotwords(std::istream &is, const SymbolTable &symbol_table,
-                    std::vector<std::vector<int32_t>> *hotwords_id);
+bool EncodeHotwords(std::istream &is, const std::string &modeling_unit,
+                    const SymbolTable &symbol_table,
+                    const ssentencepiece::Ssentencepiece *bpe_encoder_,
+                    std::vector<std::vector<int32_t>> *hotwords_id,
+                    std::vector<float> *boost_scores);
 
 /* Encode the keywords in an input stream to be tokens ids.
  *

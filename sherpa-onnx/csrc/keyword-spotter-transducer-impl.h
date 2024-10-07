@@ -66,15 +66,25 @@ class KeywordSpotterTransducerImpl : public KeywordSpotterImpl {
  public:
   explicit KeywordSpotterTransducerImpl(const KeywordSpotterConfig &config)
       : config_(config),
-        model_(OnlineTransducerModel::Create(config.model_config)),
-        sym_(config.model_config.tokens) {
-    if (sym_.contains("<unk>")) {
+        model_(OnlineTransducerModel::Create(config.model_config)) {
+    if (!config.model_config.tokens_buf.empty()) {
+      sym_ = SymbolTable(config.model_config.tokens_buf, false);
+    } else {
+      /// assuming tokens_buf and tokens are guaranteed not being both empty
+      sym_ = SymbolTable(config.model_config.tokens, true);
+    }
+
+    if (sym_.Contains("<unk>")) {
       unk_id_ = sym_["<unk>"];
     }
 
     model_->SetFeatureDim(config.feat_config.feature_dim);
 
-    InitKeywords();
+    if (config.keywords_buf.empty()) {
+      InitKeywords();
+    } else {
+      InitKeywordsFromBufStr();
+    }
 
     decoder_ = std::make_unique<TransducerKeywordDecoder>(
         model_.get(), config_.max_active_paths, config_.num_trailing_blanks,
@@ -87,7 +97,7 @@ class KeywordSpotterTransducerImpl : public KeywordSpotterImpl {
       : config_(config),
         model_(OnlineTransducerModel::Create(mgr, config.model_config)),
         sym_(mgr, config.model_config.tokens) {
-    if (sym_.contains("<unk>")) {
+    if (sym_.Contains("<unk>")) {
       unk_id_ = sym_["<unk>"];
     }
 
@@ -305,9 +315,15 @@ class KeywordSpotterTransducerImpl : public KeywordSpotterImpl {
   }
 #endif
 
+  void InitKeywordsFromBufStr() {
+    // keywords_buf's content is supposed to be same as the keywords_file's
+    std::istringstream is(config_.keywords_buf);
+    InitKeywords(is);
+  }
+
   void InitOnlineStream(OnlineStream *stream) const {
     auto r = decoder_->GetEmptyResult();
-    SHERPA_ONNX_CHECK_EQ(r.hyps.size(), 1);
+    SHERPA_ONNX_CHECK_EQ(r.hyps.Size(), 1);
 
     SHERPA_ONNX_CHECK(stream->GetContextGraph() != nullptr);
     r.hyps.begin()->second.context_state = stream->GetContextGraph()->Root();

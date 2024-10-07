@@ -51,9 +51,10 @@ static void DecodeOne(const float *log_probs, int32_t num_rows,
     bool ok = decoder->GetBestPath(&fst_out);
     if (ok) {
       std::vector<int32_t> isymbols_out;
-      std::vector<int32_t> osymbols_out_unused;
-      ok = fst::GetLinearSymbolSequence(fst_out, &isymbols_out,
-                                        &osymbols_out_unused, nullptr);
+      std::vector<int32_t> osymbols_out;
+      /*ok =*/fst::GetLinearSymbolSequence(fst_out, &isymbols_out,
+                                           &osymbols_out, nullptr);
+      // TODO(fangjun): handle ok is false
       std::vector<int64_t> tokens;
       tokens.reserve(isymbols_out.size());
 
@@ -62,7 +63,7 @@ static void DecodeOne(const float *log_probs, int32_t num_rows,
 
       std::ostringstream os;
       int32_t prev_id = -1;
-      int32_t num_trailing_blanks = 0;
+      int32_t &num_trailing_blanks = result->num_trailing_blanks;
       int32_t f = 0;  // frame number
 
       for (auto i : isymbols_out) {
@@ -83,6 +84,7 @@ static void DecodeOne(const float *log_probs, int32_t num_rows,
       }
 
       result->tokens = std::move(tokens);
+      result->words = std::move(osymbols_out);
       result->timestamps = std::move(timestamps);
       // no need to set frame_offset
     }

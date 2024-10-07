@@ -51,8 +51,13 @@ struct Hypothesis {
   // LM log prob if any.
   double lm_log_prob = 0;
 
-  // the nn lm score for next token given the current ys
+  // the nn lm score for next token given the current ys,
+  // when using shallow fusion
   CopyableOrtValue nn_lm_scores;
+
+  // cur scored tokens by RNN LM, when rescoring
+  int32_t cur_scored_pos = 0;
+
   // the nn lm states
   std::vector<CopyableOrtValue> nn_lm_states;
 
@@ -129,8 +134,8 @@ class Hypotheses {
     return os.str();
   }
 
-  const auto begin() const { return hyps_dict_.begin(); }
-  const auto end() const { return hyps_dict_.end(); }
+  auto begin() const { return hyps_dict_.begin(); }
+  auto end() const { return hyps_dict_.end(); }
 
   auto begin() { return hyps_dict_.begin(); }
   auto end() { return hyps_dict_.end(); }

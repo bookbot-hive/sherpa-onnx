@@ -30,14 +30,12 @@ concurrency:
 
 jobs:
   test-go:
-    name: ${{ matrix.os }} ${{matrix.arch }}
+    name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: macos-latest
-            arch: amd64
+        os: [macos-latest, macos-13, ubuntu-latest, windows-latest]
 
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +45,7 @@ jobs:
       - name: ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: ${{ matrix.os }}-${{ matrix.arch }}
+          key: ${{ matrix.os }}-go
 
       - uses: actions/setup-go@v5
         with:
@@ -59,26 +57,82 @@ jobs:
           go version
           go env GOPATH
           go env GOARCH
+          go env CGO_ENABLED
+
+      - name: Display go env
+        shell: bash
+        run: |
+          go env
 
       - name: Build sherpa-onnx
         shell: bash
         run: |
+          upload_dir=$PWD/to-upload
+          mkdir -p $upload_dir
+          echo "upload_dir"
+
           export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
           mkdir build
           cd build
-          cmake -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DBUILD_SHARED_LIBS=ON -DSHERPA_ONNX_ENABLE_PORTAUDIO=OFF -DSHERPA_ONNX_ENABLE_WEBSOCKET=OFF ..
-          make -j1
-          cp -v _deps/onnxruntime-src/lib/libonnxruntime*dylib ./lib/
+          cmake \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DBUILD_SHARED_LIBS=ON \
+            -DSHERPA_ONNX_ENABLE_PORTAUDIO=OFF \
+            -DSHERPA_ONNX_ENABLE_WEBSOCKET=OFF \
+            -DCMAKE_INSTALL_PREFIX=./install \
+            ..
+
+          if [[ ${{ matrix.os }} == windows-latest ]]; then
+            cmake --build . --target install --config Release -- -m:2
+          else
+            make -j2 install
+          fi
+
+          if [[ ${{ matrix.os }} == ubuntu-latest ]]; then
+            cp -v ./lib/*.so $upload_dir
+            cp -v _deps/onnxruntime-src/lib/libonnxruntime*so* $upload_dir
+
+            cp -v _deps/onnxruntime-src/lib/libonnxruntime*so* ./lib/
+
+            rm -v ./lib/*.a
+            ls -h ./lib
+          elif [[ ${{ matrix.os }} == windows-latest ]]; then
+            cp -v ./install/lib/sherpa-onnx-c-api.dll ../scripts/go/_internal/lib/x86_64-pc-windows-gnu/
+            cp -v ./install/lib/onnxruntime.dll ../scripts/go/_internal/lib/x86_64-pc-windows-gnu/
+            ls -lh ../scripts/go/_internal/lib/x86_64-pc-windows-gnu/
+            cp -v ../scripts/go/_internal/lib/x86_64-pc-windows-gnu/*.dll ../scripts/go/_internal/speaker-identification/
+            cp -v ../scripts/go/_internal/lib/x86_64-pc-windows-gnu/*.dll ../scripts/go/_internal/streaming-hlg-decoding/
+            cp -v ../scripts/go/_internal/lib/x86_64-pc-windows-gnu/*.dll ../scripts/go/_internal/non-streaming-tts/
+            cp -v ../scripts/go/_internal/lib/x86_64-pc-windows-gnu/*.dll ../scripts/go/_internal/non-streaming-decode-files/
+            cp -v ../scripts/go/_internal/lib/x86_64-pc-windows-gnu/*.dll ../scripts/go/_internal/streaming-decode-files/
+
+            cp -v ../scripts/go/_internal/lib/x86_64-pc-windows-gnu/*.dll $upload_dir
+          else
+            cp -v _deps/onnxruntime-src/lib/libonnxruntime*dylib $upload_dir/
+            cp -v lib/*.dylib $upload_dir
+
+            cp -v _deps/onnxruntime-src/lib/libonnxruntime*dylib ./lib/
+            rm ./lib/*.a
+            rm ./lib/libonnxruntime.dylib
+            cd lib
+            ln -s libonnxruntime.1.17.1.dylib libonnxruntime.dylib
+            cd ..
+          fi
 
           cd ../scripts/go/_internal/
+          ls -lh lib
+          echo "-----"
+          ls -lh lib/*/
+          echo "-----"
+
           go mod tidy
           go build
 
-      - name: Test streaming HLG decoding
-        shell: bash
-        run: |
-          cd scripts/go/_internal/streaming-hlg-decoding/
-          ./run.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-libs
+          path: to-upload/
 
       - name: Test speaker identification
         shell: bash
@@ -86,7 +140,13 @@ jobs:
           cd scripts/go/_internal/speaker-identification/
           ./run.sh
 
-      - name: Test non-streaming TTS (macOS)
+      - name: Test streaming HLG decoding
+        shell: bash
+        run: |
+          cd scripts/go/_internal/streaming-hlg-decoding/
+          ./run.sh
+
+      - name: Test non-streaming TTS
         shell: bash
         run: |
           mkdir tts-waves
@@ -98,27 +158,19 @@ jobs:
           go build
           ls -lh
 
-          git lfs install
-
           echo "Test vits-ljs"
-          git clone https://huggingface.co/csukuangfj/vits-ljs
           ./run-vits-ljs.sh
           rm -rf vits-ljs
 
           echo "Test vits-vctk"
-          git clone https://huggingface.co/csukuangfj/vits-vctk
           ./run-vits-vctk.sh
           rm -rf vits-vctk
 
           echo "Test vits-zh-aishell3"
-          curl -SL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-icefall-zh-aishell3.tar.bz2
-          tar xvf vits-icefall-zh-aishell3.tar.bz2
-          rm vits-icefall-zh-aishell3.tar.bz2
           ./run-vits-zh-aishell3.sh
           rm -rf vits-icefall-zh-aishell3
 
           echo "Test vits-piper-en_US-lessac-medium"
-          git clone https://huggingface.co/csukuangfj/vits-piper-en_US-lessac-medium
           ./run-vits-piper-en_US-lessac-medium.sh
           rm -rf vits-piper-en_US-lessac-medium
 
@@ -126,10 +178,10 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: tts-waves
+          name: tts-waves-${{ matrix.os }}
           path: tts-waves
 
-      - name: Test non-streaming decoding files (macOS)
+      - name: Test non-streaming decoding files
         shell: bash
         run: |
           cd scripts/go/_internal/non-streaming-decode-files/
@@ -139,33 +191,36 @@ jobs:
           go build
           ls -lh
 
-          git lfs install
+          echo "Test SenseVoice ctc"
+          ./run-sense-voice-small.sh
+          rm -rf sherpa-onnx-sense-*
+
+          echo "Test telespeech ctc"
+          ./run-telespeech-ctc.sh
+          rm -rf sherpa-onnx-telespeech-ctc-*
 
           echo "Test transducer"
-          git clone https://huggingface.co/csukuangfj/sherpa-onnx-zipformer-en-2023-06-26
+          ./run-transducer.sh
+          rm -rf sherpa-onnx-zipformer-en-2023-06-26
+
+          echo "Test transducer"
           ./run-transducer.sh
           rm -rf sherpa-onnx-zipformer-en-2023-06-26
 
           echo "Test paraformer"
-          git clone https://huggingface.co/csukuangfj/sherpa-onnx-paraformer-zh-2023-03-28
           ./run-paraformer.sh
-          rm -rf sherpa-onnx-paraformer-zh-2023-03-28
+          ./run-paraformer-itn.sh
+          rm -rf sherpa-onnx-paraformer-zh-2023-09-14
 
           echo "Test NeMo CTC"
-          git clone https://huggingface.co/csukuangfj/sherpa-onnx-nemo-ctc-en-conformer-medium
           ./run-nemo-ctc.sh
           rm -rf sherpa-onnx-nemo-ctc-en-conformer-medium
 
           echo "Test Whisper tiny.en"
-          GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/csukuangfj/sherpa-onnx-whisper-tiny.en
-          cd sherpa-onnx-whisper-tiny.en
-          git lfs pull --include "*.onnx"
-          cd ..
           ./run-whisper.sh
           rm -rf sherpa-onnx-whisper-tiny.en
 
           echo "Test Tdnn yesno"
-          git clone https://huggingface.co/csukuangfj/sherpa-onnx-tdnn-yesno
           ./run-tdnn-yesno.sh
           rm -rf sherpa-onnx-tdnn-yesno
 
@@ -179,22 +234,17 @@ jobs:
           go build
           ls -lh
 
-          git lfs install
-
           echo "Test zipformer2 CTC"
-          wget -qq https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-ctc-multi-zh-hans-2023-12-13.tar.bz2
-          tar xvf sherpa-onnx-streaming-zipformer-ctc-multi-zh-hans-2023-12-13.tar.bz2
-          rm sherpa-onnx-streaming-zipformer-ctc-multi-zh-hans-2023-12-13.tar.bz2
-
           ./run-zipformer2-ctc.sh
           rm -rf sherpa-onnx-streaming-zipformer-ctc-multi-zh-hans-2023-12-13
 
           echo "Test transducer"
-          git clone https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-en-2023-06-26
           ./run-transducer.sh
           rm -rf sherpa-onnx-streaming-zipformer-en-2023-06-26
 
+          ./run-transducer-itn.sh
+          rm -rf sherpa-onnx-streaming-*
+
           echo "Test paraformer"
-          git clone https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en
           ./run-paraformer.sh
           rm -rf sherpa-onnx-streaming-paraformer-bilingual-zh-en

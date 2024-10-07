@@ -8,7 +8,6 @@ import android.media.MediaRecorder
 import android.os.Bundle
 import android.text.method.ScrollingMovementMethod
 import android.util.Log
-import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -175,9 +174,8 @@ class MainActivity : AppCompatActivity() {
 
                 vad.acceptWaveform(samples)
                 while(!vad.empty()) {
-                    var objArray = vad.front()
-                    val samples = objArray[1] as FloatArray
-                    val text = runSecondPass(samples)
+                    var segment = vad.front()
+                    val text = runSecondPass(segment.samples)
 
                     if (text.isNotBlank()) {
                         lastText = "${lastText}\n${idx}: ${text}"
@@ -200,13 +198,18 @@ class MainActivity : AppCompatActivity() {
         // Please change getOfflineModelConfig() to add new models
         // See https://k2-fsa.github.io/sherpa/onnx/pretrained_models/index.html
         // for a list of available models
-        val secondType = 0
-        Log.i(TAG, "Select model type ${secondType} for the second pass")
+        val asrModelType = 0
+        val asrRuleFsts: String?
+        asrRuleFsts = null
+        Log.i(TAG, "Select model type ${asrModelType} for ASR")
 
         val config = OfflineRecognizerConfig(
             featConfig = getFeatureConfig(sampleRate = sampleRateInHz, featureDim = 80),
-            modelConfig = getOfflineModelConfig(type = secondType)!!,
+            modelConfig = getOfflineModelConfig(type = asrModelType)!!,
         )
+        if (asrRuleFsts != null) {
+            config.ruleFsts = asrRuleFsts;
+        }
 
         offlineRecognizer = OfflineRecognizer(
             assetManager = application.assets,

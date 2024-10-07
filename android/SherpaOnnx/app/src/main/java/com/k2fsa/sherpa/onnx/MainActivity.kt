@@ -196,14 +196,21 @@ class MainActivity : AppCompatActivity() {
         // See https://k2-fsa.github.io/sherpa/onnx/pretrained_models/index.html
         // for a list of available models
         val type = 0
+        var ruleFsts : String?
+        ruleFsts = null
+
         Log.i(TAG, "Select model type $type")
         val config = OnlineRecognizerConfig(
             featConfig = getFeatureConfig(sampleRate = sampleRateInHz, featureDim = 80),
             modelConfig = getModelConfig(type = type)!!,
-            lmConfig = getOnlineLMConfig(type = type),
+            // lmConfig = getOnlineLMConfig(type = type),
             endpointConfig = getEndpointConfig(),
             enableEndpoint = true,
         )
+
+        if (ruleFsts != null) {
+            config.ruleFsts = ruleFsts
+        }
 
         recognizer = OnlineRecognizer(
             assetManager = application.assets,

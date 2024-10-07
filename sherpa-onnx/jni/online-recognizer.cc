@@ -37,6 +37,21 @@ static OnlineRecognizerConfig GetConfig(JNIEnv *env, jobject config) {
   fid = env->GetFieldID(cls, "hotwordsScore", "F");
   ans.hotwords_score = env->GetFloatField(config, fid);
 
+  fid = env->GetFieldID(cls, "ruleFsts", "Ljava/lang/String;");
+  s = (jstring)env->GetObjectField(config, fid);
+  p = env->GetStringUTFChars(s, nullptr);
+  ans.rule_fsts = p;
+  env->ReleaseStringUTFChars(s, p);
+
+  fid = env->GetFieldID(cls, "ruleFars", "Ljava/lang/String;");
+  s = (jstring)env->GetObjectField(config, fid);
+  p = env->GetStringUTFChars(s, nullptr);
+  ans.rule_fars = p;
+  env->ReleaseStringUTFChars(s, p);
+
+  fid = env->GetFieldID(cls, "blankPenalty", "F");
+  ans.blank_penalty = env->GetFloatField(config, fid);
+
   //---------- feat config ----------
   fid = env->GetFieldID(cls, "featConfig",
                         "Lcom/k2fsa/sherpa/onnx/FeatureConfig;");
@@ -159,6 +174,18 @@ static OnlineRecognizerConfig GetConfig(JNIEnv *env, jobject config) {
   ans.model_config.zipformer2_ctc.model = p;
   env->ReleaseStringUTFChars(s, p);
 
+  // streaming NeMo CTC
+  fid = env->GetFieldID(model_config_cls, "neMoCtc",
+                        "Lcom/k2fsa/sherpa/onnx/OnlineNeMoCtcModelConfig;");
+  jobject nemo_ctc_config = env->GetObjectField(model_config, fid);
+  jclass nemo_ctc_config_cls = env->GetObjectClass(nemo_ctc_config);
+
+  fid = env->GetFieldID(nemo_ctc_config_cls, "model", "Ljava/lang/String;");
+  s = (jstring)env->GetObjectField(nemo_ctc_config, fid);
+  p = env->GetStringUTFChars(s, nullptr);
+  ans.model_config.nemo_ctc.model = p;
+  env->ReleaseStringUTFChars(s, p);
+
   fid = env->GetFieldID(model_config_cls, "tokens", "Ljava/lang/String;");
   s = (jstring)env->GetObjectField(model_config, fid);
   p = env->GetStringUTFChars(s, nullptr);
@@ -174,13 +201,25 @@ static OnlineRecognizerConfig GetConfig(JNIEnv *env, jobject config) {
   fid = env->GetFieldID(model_config_cls, "provider", "Ljava/lang/String;");
   s = (jstring)env->GetObjectField(model_config, fid);
   p = env->GetStringUTFChars(s, nullptr);
-  ans.model_config.provider = p;
+  ans.model_config.provider_config.provider = p;
   env->ReleaseStringUTFChars(s, p);
 
   fid = env->GetFieldID(model_config_cls, "modelType", "Ljava/lang/String;");
   s = (jstring)env->GetObjectField(model_config, fid);
   p = env->GetStringUTFChars(s, nullptr);
   ans.model_config.model_type = p;
+  env->ReleaseStringUTFChars(s, p);
+
+  fid = env->GetFieldID(model_config_cls, "modelingUnit", "Ljava/lang/String;");
+  s = (jstring)env->GetObjectField(model_config, fid);
+  p = env->GetStringUTFChars(s, nullptr);
+  ans.model_config.modeling_unit = p;
+  env->ReleaseStringUTFChars(s, p);
+
+  fid = env->GetFieldID(model_config_cls, "bpeVocab", "Ljava/lang/String;");
+  s = (jstring)env->GetObjectField(model_config, fid);
+  p = env->GetStringUTFChars(s, nullptr);
+  ans.model_config.bpe_vocab = p;
   env->ReleaseStringUTFChars(s, p);
 
   //---------- rnn lm model config ----------
@@ -197,6 +236,22 @@ static OnlineRecognizerConfig GetConfig(JNIEnv *env, jobject config) {
 
   fid = env->GetFieldID(lm_model_config_cls, "scale", "F");
   ans.lm_config.scale = env->GetFloatField(lm_model_config, fid);
+
+  fid = env->GetFieldID(cls, "ctcFstDecoderConfig",
+                        "Lcom/k2fsa/sherpa/onnx/OnlineCtcFstDecoderConfig;");
+
+  jobject fst_decoder_config = env->GetObjectField(config, fid);
+  jclass fst_decoder_config_cls = env->GetObjectClass(fst_decoder_config);
+
+  fid = env->GetFieldID(fst_decoder_config_cls, "graph", "Ljava/lang/String;");
+  s = (jstring)env->GetObjectField(fst_decoder_config, fid);
+  p = env->GetStringUTFChars(s, nullptr);
+  ans.ctc_fst_decoder_config.graph = p;
+  env->ReleaseStringUTFChars(s, p);
+
+  fid = env->GetFieldID(fst_decoder_config_cls, "maxActive", "I");
+  ans.ctc_fst_decoder_config.max_active =
+      env->GetIntField(fst_decoder_config, fid);
 
   return ans;
 }
@@ -244,13 +299,13 @@ JNIEXPORT jlong JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_newFromFile(
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_delete(
-    JNIEnv *env, jobject /*obj*/, jlong ptr) {
+    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr) {
   delete reinterpret_cast<sherpa_onnx::OnlineRecognizer *>(ptr);
 }
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_reset(
-    JNIEnv *env, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
+    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
   auto recognizer = reinterpret_cast<sherpa_onnx::OnlineRecognizer *>(ptr);
   auto stream = reinterpret_cast<sherpa_onnx::OnlineStream *>(stream_ptr);
   recognizer->Reset(stream);
@@ -258,7 +313,7 @@ JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_reset(
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT bool JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_isReady(
-    JNIEnv *env, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
+    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
   auto recognizer = reinterpret_cast<sherpa_onnx::OnlineRecognizer *>(ptr);
   auto stream = reinterpret_cast<sherpa_onnx::OnlineStream *>(stream_ptr);
 
@@ -267,7 +322,7 @@ JNIEXPORT bool JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_isReady(
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT bool JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_isEndpoint(
-    JNIEnv *env, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
+    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
   auto recognizer = reinterpret_cast<sherpa_onnx::OnlineRecognizer *>(ptr);
   auto stream = reinterpret_cast<sherpa_onnx::OnlineStream *>(stream_ptr);
 
@@ -276,7 +331,7 @@ JNIEXPORT bool JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_isEndpoint(
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_decode(
-    JNIEnv *env, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
+    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
   auto recognizer = reinterpret_cast<sherpa_onnx::OnlineRecognizer *>(ptr);
   auto stream = reinterpret_cast<sherpa_onnx::OnlineStream *>(stream_ptr);
 

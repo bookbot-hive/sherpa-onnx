@@ -1,6 +1,14 @@
 # Introduction
 
+Note: You need `Node >= 18`.
+
 This directory contains nodejs examples for [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx).
+
+It uses WebAssembly to wrap `sherpa-onnx` for NodeJS and it does not support multiple threads.
+
+Note: [../nodejs-addon-examples](../nodejs-addon-examples) uses
+[node-addon-api](https://github.com/nodejs/node-addon-api) to wrap
+`sherpa-onnx` for NodeJS and it supports multiple threads.
 
 Before you continue, please first run
 
@@ -13,7 +21,6 @@ npm i
 In the following, we describe how to use [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
 for text-to-speech and speech-to-text.
 
-Note: You need `Node >= 18`.
 
 # Text-to-speech
 
@@ -71,14 +78,29 @@ node ./test-offline-nemo-ctc.js
 
 [./test-offline-paraformer.js](./test-offline-paraformer.js) demonstrates
 how to decode a file with a non-streaming Paraformer model. In the code we use
-[sherpa-onnx-paraformer-zh-2023-03-28](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-paraformer/paraformer-models.html#csukuangfj-sherpa-onnx-paraformer-zh-2023-03-28-chinese).
+[sherpa-onnx-paraformer-zh-2023-09-14](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-paraformer/paraformer-models.html#csukuangfj-sherpa-onnx-paraformer-zh-2023-09-14-chinese).
 
 You can use the following command to run it:
 
 ```bash
-wget -q https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-2023-03-28.tar.bz2
-tar xvf sherpa-onnx-paraformer-zh-2023-03-28.tar.bz2
+wget -q https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-2023-09-14.tar.bz2
+tar xvf sherpa-onnx-paraformer-zh-2023-09-14.tar.bz2
 node ./test-offline-paraformer.js
+```
+
+## ./test-offline-sense-voice.js
+
+[./test-offline-sense-voice.js](./test-offline-sense-voice.js) demonstrates
+how to decode a file with a non-streaming Paraformer model.
+
+You can use the following command to run it:
+
+```bash
+wget https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2
+tar xvf sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2
+rm sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2
+
+node ./test-offline-sense-voice.js
 ```
 
 ## ./test-offline-transducer.js

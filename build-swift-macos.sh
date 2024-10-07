@@ -7,7 +7,6 @@ mkdir -p $dir
 cd $dir
 
 cmake \
-  -DCMAKE_OSX_ARCHITECTURES="x86_64" \
   -DCMAKE_INSTALL_PREFIX=./install \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=OFF \
@@ -33,4 +32,5 @@ libtool -static -o ./install/lib/libsherpa-onnx.a \
   ./install/lib/libkaldi-decoder-core.a \
   ./install/lib/libucd.a \
   ./install/lib/libpiper_phonemize.a \
-  ./install/lib/libespeak-ng.a
+  ./install/lib/libespeak-ng.a \
+  ./install/lib/libssentencepiece_core.a

@@ -19,13 +19,13 @@ namespace sherpa_onnx {
 class SymbolTable {
  public:
   SymbolTable() = default;
-  /// Construct a symbol table from a file.
+  /// Construct a symbol table from a file or from a buffered string.
   /// Each line in the file contains two fields:
   ///
   ///    sym ID
   ///
   /// Fields are separated by space(s).
-  explicit SymbolTable(const std::string &filename);
+  explicit SymbolTable(const std::string &filename, bool is_file = true);
 
 #if __ANDROID_API__ >= 9
   SymbolTable(AAssetManager *mgr, const std::string &filename);
@@ -35,18 +35,20 @@ class SymbolTable {
   std::string ToString() const;
 
   /// Return the symbol corresponding to the given ID.
-  const std::string &operator[](int32_t id) const;
+  const std::string operator[](int32_t id) const;
   /// Return the ID corresponding to the given symbol.
   int32_t operator[](const std::string &sym) const;
 
   /// Return true if there is a symbol with the given ID.
-  bool contains(int32_t id) const;
+  bool Contains(int32_t id) const;
 
   /// Return true if there is a given symbol in the symbol table.
-  bool contains(const std::string &sym) const;
+  bool Contains(const std::string &sym) const;
 
   // for tokens.txt from Whisper
   void ApplyBase64Decode();
+
+  int32_t NumSymbols() const { return id2sym_.size(); }
 
  private:
   void Init(std::istream &is);

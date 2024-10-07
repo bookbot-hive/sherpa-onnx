@@ -4,10 +4,9 @@
 
 #include "sherpa-onnx/csrc/online-zipformer2-transducer-model.h"
 
-#include <assert.h>
-#include <math.h>
-
 #include <algorithm>
+#include <cassert>
+#include <cmath>
 #include <memory>
 #include <numeric>
 #include <sstream>
@@ -33,9 +32,11 @@ namespace sherpa_onnx {
 
 OnlineZipformer2TransducerModel::OnlineZipformer2TransducerModel(
     const OnlineModelConfig &config)
-    : env_(ORT_LOGGING_LEVEL_WARNING),
+    : env_(ORT_LOGGING_LEVEL_ERROR),
+      encoder_sess_opts_(GetSessionOptions(config)),
+      decoder_sess_opts_(GetSessionOptions(config, "decoder")),
+      joiner_sess_opts_(GetSessionOptions(config, "joiner")),
       config_(config),
-      sess_opts_(GetSessionOptions(config)),
       allocator_{} {
   {
     auto buf = ReadFile(config.transducer.encoder);
@@ -56,9 +57,11 @@ OnlineZipformer2TransducerModel::OnlineZipformer2TransducerModel(
 #if __ANDROID_API__ >= 9
 OnlineZipformer2TransducerModel::OnlineZipformer2TransducerModel(
     AAssetManager *mgr, const OnlineModelConfig &config)
-    : env_(ORT_LOGGING_LEVEL_WARNING),
+    : env_(ORT_LOGGING_LEVEL_ERROR),
       config_(config),
-      sess_opts_(GetSessionOptions(config)),
+      encoder_sess_opts_(GetSessionOptions(config)),
+      decoder_sess_opts_(GetSessionOptions(config)),
+      joiner_sess_opts_(GetSessionOptions(config)),
       allocator_{} {
   {
     auto buf = ReadFile(mgr, config.transducer.encoder);
@@ -79,8 +82,8 @@ OnlineZipformer2TransducerModel::OnlineZipformer2TransducerModel(
 
 void OnlineZipformer2TransducerModel::InitEncoder(void *model_data,
                                                   size_t model_data_length) {
-  encoder_sess_ = std::make_unique<Ort::Session>(env_, model_data,
-                                                 model_data_length, sess_opts_);
+  encoder_sess_ = std::make_unique<Ort::Session>(
+      env_, model_data, model_data_length, encoder_sess_opts_);
 
   GetInputNames(encoder_sess_.get(), &encoder_input_names_,
                 &encoder_input_names_ptr_);
@@ -132,8 +135,8 @@ void OnlineZipformer2TransducerModel::InitEncoder(void *model_data,
 
 void OnlineZipformer2TransducerModel::InitDecoder(void *model_data,
                                                   size_t model_data_length) {
-  decoder_sess_ = std::make_unique<Ort::Session>(env_, model_data,
-                                                 model_data_length, sess_opts_);
+  decoder_sess_ = std::make_unique<Ort::Session>(
+      env_, model_data, model_data_length, decoder_sess_opts_);
 
   GetInputNames(decoder_sess_.get(), &decoder_input_names_,
                 &decoder_input_names_ptr_);
@@ -157,8 +160,8 @@ void OnlineZipformer2TransducerModel::InitDecoder(void *model_data,
 
 void OnlineZipformer2TransducerModel::InitJoiner(void *model_data,
                                                  size_t model_data_length) {
-  joiner_sess_ = std::make_unique<Ort::Session>(env_, model_data,
-                                                model_data_length, sess_opts_);
+  joiner_sess_ = std::make_unique<Ort::Session>(
+      env_, model_data, model_data_length, joiner_sess_opts_);
 
   GetInputNames(joiner_sess_.get(), &joiner_input_names_,
                 &joiner_input_names_ptr_);
@@ -179,7 +182,6 @@ void OnlineZipformer2TransducerModel::InitJoiner(void *model_data,
 std::vector<Ort::Value> OnlineZipformer2TransducerModel::StackStates(
     const std::vector<std::vector<Ort::Value>> &states) const {
   int32_t batch_size = static_cast<int32_t>(states.size());
-  int32_t num_encoders = static_cast<int32_t>(num_encoder_layers_.size());
 
   std::vector<const Ort::Value *> buf(batch_size);
 
@@ -255,10 +257,9 @@ OnlineZipformer2TransducerModel::UnStackStates(
     const std::vector<Ort::Value> &states) const {
   int32_t m = std::accumulate(num_encoder_layers_.begin(),
                               num_encoder_layers_.end(), 0);
-  assert(states.size() == m * 6 + 2);
+  assert(static_cast<int32_t>(states.size()) == m * 6 + 2);
 
   int32_t batch_size = states[0].GetTensorTypeAndShapeInfo().GetShape()[1];
-  int32_t num_encoders = num_encoder_layers_.size();
 
   std::vector<std::vector<Ort::Value>> ans;
   ans.resize(batch_size);
@@ -266,7 +267,7 @@ OnlineZipformer2TransducerModel::UnStackStates(
   for (int32_t i = 0; i != m; ++i) {
     {
       auto v = Unbind(allocator_, &states[i * 6], 1);
-      assert(v.size() == batch_size);
+      assert(static_cast<int32_t>(v.size()) == batch_size);
 
       for (int32_t n = 0; n != batch_size; ++n) {
         ans[n].push_back(std::move(v[n]));
@@ -274,7 +275,7 @@ OnlineZipformer2TransducerModel::UnStackStates(
     }
     {
       auto v = Unbind(allocator_, &states[i * 6 + 1], 1);
-      assert(v.size() == batch_size);
+      assert(static_cast<int32_t>(v.size()) == batch_size);
 
       for (int32_t n = 0; n != batch_size; ++n) {
         ans[n].push_back(std::move(v[n]));
@@ -282,7 +283,7 @@ OnlineZipformer2TransducerModel::UnStackStates(
     }
     {
       auto v = Unbind(allocator_, &states[i * 6 + 2], 1);
-      assert(v.size() == batch_size);
+      assert(static_cast<int32_t>(v.size()) == batch_size);
 
       for (int32_t n = 0; n != batch_size; ++n) {
         ans[n].push_back(std::move(v[n]));
@@ -290,7 +291,7 @@ OnlineZipformer2TransducerModel::UnStackStates(
     }
     {
       auto v = Unbind(allocator_, &states[i * 6 + 3], 1);
-      assert(v.size() == batch_size);
+      assert(static_cast<int32_t>(v.size()) == batch_size);
 
       for (int32_t n = 0; n != batch_size; ++n) {
         ans[n].push_back(std::move(v[n]));
@@ -298,7 +299,7 @@ OnlineZipformer2TransducerModel::UnStackStates(
     }
     {
       auto v = Unbind(allocator_, &states[i * 6 + 4], 0);
-      assert(v.size() == batch_size);
+      assert(static_cast<int32_t>(v.size()) == batch_size);
 
       for (int32_t n = 0; n != batch_size; ++n) {
         ans[n].push_back(std::move(v[n]));
@@ -306,7 +307,7 @@ OnlineZipformer2TransducerModel::UnStackStates(
     }
     {
       auto v = Unbind(allocator_, &states[i * 6 + 5], 0);
-      assert(v.size() == batch_size);
+      assert(static_cast<int32_t>(v.size()) == batch_size);
 
       for (int32_t n = 0; n != batch_size; ++n) {
         ans[n].push_back(std::move(v[n]));
@@ -316,7 +317,7 @@ OnlineZipformer2TransducerModel::UnStackStates(
 
   {
     auto v = Unbind(allocator_, &states[m * 6], 0);
-    assert(v.size() == batch_size);
+    assert(static_cast<int32_t>(v.size()) == batch_size);
 
     for (int32_t n = 0; n != batch_size; ++n) {
       ans[n].push_back(std::move(v[n]));
@@ -324,7 +325,7 @@ OnlineZipformer2TransducerModel::UnStackStates(
   }
   {
     auto v = Unbind<int64_t>(allocator_, &states[m * 6 + 1], 0);
-    assert(v.size() == batch_size);
+    assert(static_cast<int32_t>(v.size()) == batch_size);
 
     for (int32_t n = 0; n != batch_size; ++n) {
       ans[n].push_back(std::move(v[n]));

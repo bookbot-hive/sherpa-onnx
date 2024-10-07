@@ -13,7 +13,7 @@ on:
       - 'toolchains/riscv64-linux-gnu.toolchain.cmake'
       - 'build-riscv64-linux-gnu.sh'
     tags:
-      - '*'
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
   pull_request:
     branches:
       - master
@@ -123,7 +123,15 @@ jobs:
           ls -lh build-riscv64-linux-gnu/bin
           ls -lh build-riscv64-linux-gnu/lib
 
+          echo "---install/lib---"
+          ls -lh build-riscv64-linux-gnu/install/lib
+
+          echo "---install/bin---"
+          ls -lh build-riscv64-linux-gnu/install/bin
+
           file build-riscv64-linux-gnu/bin/sherpa-onnx
+
+          readelf -d build-riscv64-linux-gnu/bin/sherpa-onnx
 
       - name: Test sherpa-onnx
         shell: bash
@@ -210,8 +218,6 @@ jobs:
             cp -a build-riscv64-linux-gnu/install/lib $dst/
             rm -fv $dst/lib/libasound.so
             rm -fv $dst/lib/libonnxruntime.so
-            rm -fv $dst/lib/libsherpa-onnx-fst.so
-            rm -fv $dst/lib/libsherpa-onnx-fstfar.so
           fi
 
           tree $dst
@@ -239,11 +245,11 @@ jobs:
             git config --global user.name "Fangjun Kuang"
 
             rm -rf huggingface
+            export GIT_CLONE_PROTECTION_ACTIVE=false
 
             GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/csukuangfj/sherpa-onnx-libs huggingface
 
             cd huggingface
-            git lfs pull
             mkdir -p riscv64
 
             cp -v ../sherpa-onnx-*-shared.tar.bz2 ./riscv64
