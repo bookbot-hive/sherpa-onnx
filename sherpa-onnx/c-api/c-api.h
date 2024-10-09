@@ -13,6 +13,7 @@
 #define SHERPA_ONNX_C_API_C_API_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {

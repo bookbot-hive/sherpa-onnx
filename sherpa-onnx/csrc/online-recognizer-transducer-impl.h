@@ -462,7 +462,8 @@ class OnlineRecognizerTransducerImpl : public OnlineRecognizerImpl {
 
     std::istringstream iss(config_.hotwords_buf);
     if (!EncodeHotwords(iss, config_.model_config.modeling_unit, sym_,
-                        bpe_encoder_.get(), &hotwords_, &boost_scores_)) {
+                        config_.tokenize_hotwords, bpe_encoder_.get(),
+                        &hotwords_, &boost_scores_)) {
       SHERPA_ONNX_LOGE(
           "Failed to encode some hotwords, skip them already, see logs above "
           "for details.");
