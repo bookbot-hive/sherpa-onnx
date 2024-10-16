@@ -38,7 +38,7 @@ static OnlineRecognizerConfig GetConfig(JNIEnv *env, jobject config) {
   ans.hotwords_score = env->GetFloatField(config, fid);
 
   fid = env->GetFieldID(cls, "tokenizeHotwords", "Z");
-  ans.tokenize_hotwords = env->GetFloatField(config, fid);
+  ans.tokenize_hotwords = env->GetBooleanField(config, fid);
 
   fid = env->GetFieldID(cls, "ruleFsts", "Ljava/lang/String;");
   s = (jstring)env->GetObjectField(config, fid);
