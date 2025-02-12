@@ -97,7 +97,7 @@ struct OnlineRecognizerConfig {
   float hotwords_score = 1.5;
   /// Whether to tokenize the input hotwords, normally should be true
   /// if false, you have to tokenize hotwords by yourself.
-  bool tokenize_hotwords = true;
+  bool tokenize_hotwords = false;
 
   float blank_penalty = 0.0;
 

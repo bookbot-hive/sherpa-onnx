@@ -23,7 +23,7 @@ static void PybindOfflineRecognizerConfig(py::module *m) {
            py::arg("ctc_fst_decoder_config") = OfflineCtcFstDecoderConfig(),
            py::arg("decoding_method") = "greedy_search",
            py::arg("max_active_paths") = 4, py::arg("hotwords_file") = "",
-           py::arg("hotwords_score") = 1.5, py::arg("tokenize_hotwords") = true,
+           py::arg("hotwords_score") = 1.5, py::arg("tokenize_hotwords") = false,
            py::arg("blank_penalty") = 0.0, py::arg("rule_fsts") = "",
            py::arg("rule_fars") = "")
       .def_readwrite("feat_config", &PyClass::feat_config)

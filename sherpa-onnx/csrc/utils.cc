@@ -112,6 +112,12 @@ bool EncodeHotwords(std::istream &is, const std::string &modeling_unit,
   std::string line;
   std::string word;
 
+  SHERPA_ONNX_LOGE("ASR log tokenize_hotwords: %d", tokenize_hotwords);
+  // log hotwords
+  if (hotwords != nullptr) {
+    SHERPA_ONNX_LOGE("Hotwords size: %d", hotwords->size());
+  }
+
   if (!tokenize_hotwords) {
     while (std::getline(is, line)) {
       lines.push_back(line);
