@@ -98,7 +98,7 @@ cmake -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK/build/cmake/android.toolchain.cmake" 
     -DSHERPA_ONNX_ENABLE_C_API=$SHERPA_ONNX_ENABLE_C_API \
     -DCMAKE_INSTALL_PREFIX=./install \
     -DANDROID_ABI="armeabi-v7a" -DANDROID_ARM_NEON=ON \
-    -DANDROID_PLATFORM=android-21 ..
+    -DANDROID_PLATFORM=android-27 ..
 # make VERBOSE=1 -j4
 make -j4
 make install/strip
