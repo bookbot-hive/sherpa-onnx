@@ -286,6 +286,7 @@ if(SHERPA_ONNX_ENABLE_TTS)
     offline-tts-model-config.cc
     offline-tts-pocket-model-config.cc
     offline-tts-pocket-model.cc
+    offline-tts-pocket-voice-state.cc
     offline-tts-supertonic-impl.cc
     offline-tts-supertonic-model-config.cc
     offline-tts-supertonic-model.cc
@@ -826,6 +827,7 @@ if(SHERPA_ONNX_ENABLE_TESTS)
     list(APPEND sherpa_onnx_test_srcs
       sentence-piece-tokenizer-test.cc
       piper-phonemize-test.cc
+      test-offline-tts-pocket-voice-state.cc
     )
   endif()
 
