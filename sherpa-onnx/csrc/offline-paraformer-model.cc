@@ -5,9 +5,21 @@
 #include "sherpa-onnx/csrc/offline-paraformer-model.h"
 
 #include <algorithm>
+#include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
+#if __ANDROID_API__ >= 9
+#include "android/asset_manager.h"
+#include "android/asset_manager_jni.h"
+#endif
+
+#if __OHOS__
+#include "rawfile/raw_file_manager.h"
+#endif
+
+#include "sherpa-onnx/csrc/file-utils.h"
 #include "sherpa-onnx/csrc/macros.h"
 #include "sherpa-onnx/csrc/onnx-utils.h"
 #include "sherpa-onnx/csrc/session.h"
@@ -22,12 +34,13 @@ class OfflineParaformerModel::Impl {
         env_(ORT_LOGGING_LEVEL_ERROR),
         sess_opts_(GetSessionOptions(config)),
         allocator_{} {
-    auto buf = ReadFile(config_.paraformer.model);
-    Init(buf.data(), buf.size());
+    sess_ = std::make_unique<Ort::Session>(
+        env_, SHERPA_ONNX_TO_ORT_PATH(config_.paraformer.model), sess_opts_);
+    Init(nullptr, 0);
   }
 
-#if __ANDROID_API__ >= 9
-  Impl(AAssetManager *mgr, const OfflineModelConfig &config)
+  template <typename Manager>
+  Impl(Manager *mgr, const OfflineModelConfig &config)
       : config_(config),
         env_(ORT_LOGGING_LEVEL_ERROR),
         sess_opts_(GetSessionOptions(config)),
@@ -35,7 +48,6 @@ class OfflineParaformerModel::Impl {
     auto buf = ReadFile(mgr, config_.paraformer.model);
     Init(buf.data(), buf.size());
   }
-#endif
 
   std::vector<Ort::Value> Forward(Ort::Value features,
                                   Ort::Value features_length) {
@@ -56,12 +68,19 @@ class OfflineParaformerModel::Impl {
 
   const std::vector<float> &InverseStdDev() const { return inv_stddev_; }
 
-  OrtAllocator *Allocator() const { return allocator_; }
+  OrtAllocator *Allocator() { return allocator_; }
 
  private:
   void Init(void *model_data, size_t model_data_length) {
-    sess_ = std::make_unique<Ort::Session>(env_, model_data, model_data_length,
-                                           sess_opts_);
+    if (model_data) {
+      sess_ = std::make_unique<Ort::Session>(
+          env_, model_data, model_data_length, sess_opts_);
+    } else if (!sess_) {
+      SHERPA_ONNX_LOGE(
+          "Please pass model data or initialize the session outside of "
+          "this function");
+      SHERPA_ONNX_EXIT(-1);
+    }
 
     GetInputNames(sess_.get(), &input_names_, &input_names_ptr_);
 
@@ -72,7 +91,11 @@ class OfflineParaformerModel::Impl {
     if (config_.debug) {
       std::ostringstream os;
       PrintModelMetadata(os, meta_data);
+#if __OHOS__
+      SHERPA_ONNX_LOGE("%{public}s\n", os.str().c_str());
+#else
       SHERPA_ONNX_LOGE("%s\n", os.str().c_str());
+#endif
     }
 
     Ort::AllocatorWithDefaultOptions allocator;  // used in the macro below
@@ -109,11 +132,10 @@ class OfflineParaformerModel::Impl {
 OfflineParaformerModel::OfflineParaformerModel(const OfflineModelConfig &config)
     : impl_(std::make_unique<Impl>(config)) {}
 
-#if __ANDROID_API__ >= 9
-OfflineParaformerModel::OfflineParaformerModel(AAssetManager *mgr,
+template <typename Manager>
+OfflineParaformerModel::OfflineParaformerModel(Manager *mgr,
                                                const OfflineModelConfig &config)
     : impl_(std::make_unique<Impl>(mgr, config)) {}
-#endif
 
 OfflineParaformerModel::~OfflineParaformerModel() = default;
 
@@ -140,5 +162,15 @@ const std::vector<float> &OfflineParaformerModel::InverseStdDev() const {
 OrtAllocator *OfflineParaformerModel::Allocator() const {
   return impl_->Allocator();
 }
+
+#if __ANDROID_API__ >= 9
+template OfflineParaformerModel::OfflineParaformerModel(
+    AAssetManager *mgr, const OfflineModelConfig &config);
+#endif
+
+#if __OHOS__
+template OfflineParaformerModel::OfflineParaformerModel(
+    NativeResourceManager *mgr, const OfflineModelConfig &config);
+#endif
 
 }  // namespace sherpa_onnx

@@ -4,10 +4,10 @@ set -e
 
 function install_3d_speaker() {
   echo "Install 3D-Speaker"
-  git clone https://github.com/alibaba-damo-academy/3D-Speaker.git
+  git clone https://github.com/modelscope/3D-Speaker
   pushd 3D-Speaker
   pip install -q -r ./requirements.txt
-  pip install -q modelscope onnx onnxruntime kaldi-native-fbank
+  pip install -q modelscope==1.14.0 onnx onnxruntime kaldi-native-fbank
   popd
 }
 
@@ -31,11 +31,13 @@ export PYTHONPATH=$PWD/3D-Speaker/speakerlab/bin:$PYTHONPATH
 models=(
 speech_campplus_sv_en_voxceleb_16k
 speech_campplus_sv_zh-cn_16k-common
+speech_campplus_sv_zh_en_16k-common_advanced
 speech_eres2net_sv_en_voxceleb_16k
 speech_eres2net_sv_zh-cn_16k-common
 speech_eres2net_base_200k_sv_zh-cn_16k-common
 speech_eres2net_base_sv_zh-cn_3dspeaker_16k
 speech_eres2net_large_sv_zh-cn_3dspeaker_16k
+speech_eres2netv2_sv_zh-cn_16k-common
 )
 for model in ${models[@]}; do
   echo "--------------------$model--------------------"

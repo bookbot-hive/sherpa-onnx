@@ -65,7 +65,8 @@ jobs:
               rm -rf huggingface
               export GIT_LFS_SKIP_SMUDGE=1
               d=sherpa-onnx-ced-$m-audio-tagging-2024-04-19
-              git clone https://huggingface.co/k2-fsa/$d huggingface
+              export GIT_CLONE_PROTECTION_ACTIVE=false
+              git clone https://csukuangfj:$HF_TOKEN@huggingface.co/k2-fsa/$d huggingface
               mv -v $d/* huggingface
               cd huggingface
               git lfs track "*.onnx"

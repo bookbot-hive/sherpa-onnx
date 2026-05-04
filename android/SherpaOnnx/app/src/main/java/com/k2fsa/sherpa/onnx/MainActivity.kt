@@ -12,6 +12,9 @@ import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 import kotlin.concurrent.thread
 
 private const val TAG = "sherpa-onnx"
@@ -196,14 +199,38 @@ class MainActivity : AppCompatActivity() {
         // See https://k2-fsa.github.io/sherpa/onnx/pretrained_models/index.html
         // for a list of available models
         val type = 0
+        var ruleFsts : String?
+        ruleFsts = null
+
+        val useHr = false
+        val hr =  HomophoneReplacerConfig(
+            // Used only when useHr is true
+            // Please download the following 3 files from
+            // https://github.com/k2-fsa/sherpa-onnx/releases/tag/hr-files
+            //
+            // dict and lexicon.txt can be shared by different apps
+            //
+            // replace.fst is specific for an app
+            lexicon = "lexicon.txt",
+            ruleFsts = "replace.fst",
+        )
+
         Log.i(TAG, "Select model type $type")
-        val config = OnlineRecognizerConfig(
+        var config = OnlineRecognizerConfig(
             featConfig = getFeatureConfig(sampleRate = sampleRateInHz, featureDim = 80),
             modelConfig = getModelConfig(type = type)!!,
-            lmConfig = getOnlineLMConfig(type = type),
+            // lmConfig = getOnlineLMConfig(type = type),
             endpointConfig = getEndpointConfig(),
             enableEndpoint = true,
         )
+
+        if (ruleFsts != null) {
+            config.ruleFsts = ruleFsts
+        }
+
+        if (useHr) {
+            config.hr = hr
+        }
 
         recognizer = OnlineRecognizer(
             assetManager = application.assets,

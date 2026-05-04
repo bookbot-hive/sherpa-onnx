@@ -3,13 +3,13 @@ package com.k2fsa.sherpa.onnx
 import android.content.res.AssetManager
 
 data class SpokenLanguageIdentificationWhisperConfig(
-    var encoder: String,
-    var decoder: String,
+    var encoder: String = "",
+    var decoder: String = "",
     var tailPaddings: Int = -1,
 )
 
 data class SpokenLanguageIdentificationConfig(
-    var whisper: SpokenLanguageIdentificationWhisperConfig,
+    var whisper: SpokenLanguageIdentificationWhisperConfig = SpokenLanguageIdentificationWhisperConfig(),
     var numThreads: Int = 1,
     var debug: Boolean = false,
     var provider: String = "cpu",
@@ -91,8 +91,8 @@ fun getSpokenLanguageIdentificationConfig(
             val modelDir = "sherpa-onnx-whisper-base"
             return SpokenLanguageIdentificationConfig(
                 whisper = SpokenLanguageIdentificationWhisperConfig(
-                    encoder = "$modelDir/tiny-encoder.int8.onnx",
-                    decoder = "$modelDir/tiny-decoder.int8.onnx",
+                    encoder = "$modelDir/base-encoder.int8.onnx",
+                    decoder = "$modelDir/base-decoder.int8.onnx",
                 ),
                 numThreads = 1,
                 debug = true,

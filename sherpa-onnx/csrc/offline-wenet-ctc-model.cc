@@ -4,6 +4,21 @@
 
 #include "sherpa-onnx/csrc/offline-wenet-ctc-model.h"
 
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#if __ANDROID_API__ >= 9
+#include "android/asset_manager.h"
+#include "android/asset_manager_jni.h"
+#endif
+
+#if __OHOS__
+#include "rawfile/raw_file_manager.h"
+#endif
+
+#include "sherpa-onnx/csrc/file-utils.h"
 #include "sherpa-onnx/csrc/macros.h"
 #include "sherpa-onnx/csrc/onnx-utils.h"
 #include "sherpa-onnx/csrc/session.h"
@@ -19,12 +34,13 @@ class OfflineWenetCtcModel::Impl {
         env_(ORT_LOGGING_LEVEL_ERROR),
         sess_opts_(GetSessionOptions(config)),
         allocator_{} {
-    auto buf = ReadFile(config_.wenet_ctc.model);
-    Init(buf.data(), buf.size());
+    sess_ = std::make_unique<Ort::Session>(
+        env_, SHERPA_ONNX_TO_ORT_PATH(config_.wenet_ctc.model), sess_opts_);
+    Init(nullptr, 0);
   }
 
-#if __ANDROID_API__ >= 9
-  Impl(AAssetManager *mgr, const OfflineModelConfig &config)
+  template <typename Manager>
+  Impl(Manager *mgr, const OfflineModelConfig &config)
       : config_(config),
         env_(ORT_LOGGING_LEVEL_ERROR),
         sess_opts_(GetSessionOptions(config)),
@@ -32,7 +48,6 @@ class OfflineWenetCtcModel::Impl {
     auto buf = ReadFile(mgr, config_.wenet_ctc.model);
     Init(buf.data(), buf.size());
   }
-#endif
 
   std::vector<Ort::Value> Forward(Ort::Value features,
                                   Ort::Value features_length) {
@@ -47,12 +62,19 @@ class OfflineWenetCtcModel::Impl {
 
   int32_t SubsamplingFactor() const { return subsampling_factor_; }
 
-  OrtAllocator *Allocator() const { return allocator_; }
+  OrtAllocator *Allocator() { return allocator_; }
 
  private:
   void Init(void *model_data, size_t model_data_length) {
-    sess_ = std::make_unique<Ort::Session>(env_, model_data, model_data_length,
-                                           sess_opts_);
+    if (model_data) {
+      sess_ = std::make_unique<Ort::Session>(
+          env_, model_data, model_data_length, sess_opts_);
+    } else if (!sess_) {
+      SHERPA_ONNX_LOGE(
+          "Please pass model data or initialize the session outside of "
+          "this function");
+      SHERPA_ONNX_EXIT(-1);
+    }
 
     GetInputNames(sess_.get(), &input_names_, &input_names_ptr_);
 
@@ -63,7 +85,11 @@ class OfflineWenetCtcModel::Impl {
     if (config_.debug) {
       std::ostringstream os;
       PrintModelMetadata(os, meta_data);
+#if __OHOS__
+      SHERPA_ONNX_LOGE("%{public}s\n", os.str().c_str());
+#else
       SHERPA_ONNX_LOGE("%s\n", os.str().c_str());
+#endif
     }
 
     Ort::AllocatorWithDefaultOptions allocator;  // used in the macro below
@@ -92,11 +118,10 @@ class OfflineWenetCtcModel::Impl {
 OfflineWenetCtcModel::OfflineWenetCtcModel(const OfflineModelConfig &config)
     : impl_(std::make_unique<Impl>(config)) {}
 
-#if __ANDROID_API__ >= 9
-OfflineWenetCtcModel::OfflineWenetCtcModel(AAssetManager *mgr,
+template <typename Manager>
+OfflineWenetCtcModel::OfflineWenetCtcModel(Manager *mgr,
                                            const OfflineModelConfig &config)
     : impl_(std::make_unique<Impl>(mgr, config)) {}
-#endif
 
 OfflineWenetCtcModel::~OfflineWenetCtcModel() = default;
 
@@ -114,5 +139,15 @@ int32_t OfflineWenetCtcModel::SubsamplingFactor() const {
 OrtAllocator *OfflineWenetCtcModel::Allocator() const {
   return impl_->Allocator();
 }
+
+#if __ANDROID_API__ >= 9
+template OfflineWenetCtcModel::OfflineWenetCtcModel(
+    AAssetManager *mgr, const OfflineModelConfig &config);
+#endif
+
+#if __OHOS__
+template OfflineWenetCtcModel::OfflineWenetCtcModel(
+    NativeResourceManager *mgr, const OfflineModelConfig &config);
+#endif
 
 }  // namespace sherpa_onnx

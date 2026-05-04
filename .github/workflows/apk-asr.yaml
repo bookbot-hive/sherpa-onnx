@@ -2,8 +2,8 @@ name: apk-asr
 
 on:
   push:
-    tags:
-      - '*'
+    branches:
+      - apk
 
   workflow_dispatch:
 
@@ -23,13 +23,19 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        total: ["1"]
-        index: ["0"]
+        total: ["15"]
+        index: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"]
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Update version
+        shell: bash
+        run: |
+          ./new-release.sh
+          git diff .
 
       # https://github.com/actions/setup-java
       - uses: actions/setup-java@v4
@@ -158,17 +164,22 @@ jobs:
 
             rm -rf huggingface
             export GIT_LFS_SKIP_SMUDGE=1
+            export GIT_CLONE_PROTECTION_ACTIVE=false
 
-            git clone https://huggingface.co/csukuangfj/sherpa-onnx-apk huggingface
+            SHERPA_ONNX_VERSION=$(grep "SHERPA_ONNX_VERSION" ./CMakeLists.txt  | cut -d " " -f 2  | cut -d '"' -f 2)
+            echo "SHERPA_ONNX_VERSION $SHERPA_ONNX_VERSION"
+
+            git clone https://csukuangfj2:$HF_TOKEN@huggingface.co/csukuangfj2/sherpa-onnx-apk huggingface
             cd huggingface
             git fetch
             git pull
             git merge -m "merge remote" --ff origin main
 
-            mkdir -p asr
-            cp -v ../apks/*.apk ./asr/
+            d=asr/$SHERPA_ONNX_VERSION
+            mkdir -p $d
+            cp -v ../apks/*.apk $d/
             git status
             git lfs track "*.apk"
             git add .
             git commit -m "add more apks"
-            git push https://csukuangfj:$HF_TOKEN@huggingface.co/csukuangfj/sherpa-onnx-apk main
+            git push https://csukuangfj2:$HF_TOKEN@huggingface.co/csukuangfj2/sherpa-onnx-apk main

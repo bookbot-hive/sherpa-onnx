@@ -11,12 +11,9 @@
 #include <utility>
 #include <vector>
 
-#if __ANDROID_API__ >= 9
-#include "android/asset_manager.h"
-#include "android/asset_manager_jni.h"
-#endif
-
+#include "Eigen/Dense"
 #include "sherpa-onnx/csrc/offline-model-config.h"
+#include "sherpa-onnx/csrc/macros.h"
 #include "sherpa-onnx/csrc/offline-paraformer-decoder.h"
 #include "sherpa-onnx/csrc/offline-paraformer-greedy-search-decoder.h"
 #include "sherpa-onnx/csrc/offline-paraformer-model.h"
@@ -27,8 +24,8 @@
 
 namespace sherpa_onnx {
 
-static OfflineRecognitionResult Convert(
-    const OfflineParaformerDecoderResult &src, const SymbolTable &sym_table) {
+OfflineRecognitionResult Convert(const OfflineParaformerDecoderResult &src,
+                                 const SymbolTable &sym_table) {
   OfflineRecognitionResult r;
   r.tokens.reserve(src.tokens.size());
   r.timestamps = src.timestamps;
@@ -59,9 +56,9 @@ static OfflineRecognitionResult Convert(
         mergeable = false;
 
         if (i > 0) {
-          const uint8_t *p = reinterpret_cast<const uint8_t *>(
-              sym_table[src.tokens[i - 1]].c_str());
-          if (p[0] < 0x80) {
+          const uint8_t p = reinterpret_cast<const uint8_t *>(
+              sym_table[src.tokens[i - 1]].c_str())[0];
+          if (p < 0x80) {
             // put a space between ascii and non-ascii
             text.append(" ");
           }
@@ -89,7 +86,8 @@ class OfflineRecognizerParaformerImpl : public OfflineRecognizerImpl {
  public:
   explicit OfflineRecognizerParaformerImpl(
       const OfflineRecognizerConfig &config)
-      : config_(config),
+      : OfflineRecognizerImpl(config),
+        config_(config),
         symbol_table_(config_.model_config.tokens),
         model_(std::make_unique<OfflineParaformerModel>(config.model_config)) {
     if (config.decoding_method == "greedy_search") {
@@ -98,18 +96,17 @@ class OfflineRecognizerParaformerImpl : public OfflineRecognizerImpl {
     } else {
       SHERPA_ONNX_LOGE("Only greedy_search is supported at present. Given %s",
                        config.decoding_method.c_str());
-      exit(-1);
+      SHERPA_ONNX_EXIT(-1);
     }
 
-    // Paraformer models assume input samples are in the range
-    // [-32768, 32767], so we set normalize_samples to false
-    config_.feat_config.normalize_samples = false;
+    InitFeatConfig();
   }
 
-#if __ANDROID_API__ >= 9
-  OfflineRecognizerParaformerImpl(AAssetManager *mgr,
+  template <typename Manager>
+  OfflineRecognizerParaformerImpl(Manager *mgr,
                                   const OfflineRecognizerConfig &config)
-      : config_(config),
+      : OfflineRecognizerImpl(mgr, config),
+        config_(config),
         symbol_table_(mgr, config_.model_config.tokens),
         model_(std::make_unique<OfflineParaformerModel>(mgr,
                                                         config.model_config)) {
@@ -119,14 +116,11 @@ class OfflineRecognizerParaformerImpl : public OfflineRecognizerImpl {
     } else {
       SHERPA_ONNX_LOGE("Only greedy_search is supported at present. Given %s",
                        config.decoding_method.c_str());
-      exit(-1);
+      SHERPA_ONNX_EXIT(-1);
     }
 
-    // Paraformer models assume input samples are in the range
-    // [-32768, 32767], so we set normalize_samples to false
-    config_.feat_config.normalize_samples = false;
+    InitFeatConfig();
   }
-#endif
 
   std::unique_ptr<OfflineStream> CreateStream() const override {
     return std::make_unique<OfflineStream>(config_.feat_config);
@@ -204,11 +198,24 @@ class OfflineRecognizerParaformerImpl : public OfflineRecognizerImpl {
 
     for (int32_t i = 0; i != n; ++i) {
       auto r = Convert(results[i], symbol_table_);
+      r.text = ApplyInverseTextNormalization(std::move(r.text));
+      r.text = ApplyHomophoneReplacer(std::move(r.text));
       ss[i]->SetResult(r);
     }
   }
 
+  OfflineRecognizerConfig GetConfig() const override { return config_; }
+
  private:
+  void InitFeatConfig() {
+    // Paraformer models assume input samples are in the range
+    // [-32768, 32767], so we set normalize_samples to false
+    config_.feat_config.normalize_samples = false;
+    config_.feat_config.window_type = "hamming";
+    config_.feat_config.high_freq = 0;
+    config_.feat_config.snip_edges = true;
+  }
+
   std::vector<float> ApplyLFR(const std::vector<float> &in) const {
     int32_t lfr_window_size = model_->LfrWindowSize();
     int32_t lfr_window_shift = model_->LfrWindowShift();
@@ -237,19 +244,18 @@ class OfflineRecognizerParaformerImpl : public OfflineRecognizerImpl {
   void ApplyCMVN(std::vector<float> *v) const {
     const std::vector<float> &neg_mean = model_->NegativeMean();
     const std::vector<float> &inv_stddev = model_->InverseStdDev();
+    int32_t dim = static_cast<int32_t>(neg_mean.size());
+    int32_t num_frames = static_cast<int32_t>(v->size()) / dim;
 
-    int32_t dim = neg_mean.size();
-    int32_t num_frames = v->size() / dim;
+    Eigen::Map<
+        Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
+        mat(v->data(), num_frames, dim);
 
-    float *p = v->data();
+    Eigen::Map<const Eigen::RowVectorXf> neg_mean_vec(neg_mean.data(), dim);
+    Eigen::Map<const Eigen::RowVectorXf> inv_stddev_vec(inv_stddev.data(), dim);
 
-    for (int32_t i = 0; i != num_frames; ++i) {
-      for (int32_t k = 0; k != dim; ++k) {
-        p[k] = (p[k] + neg_mean[k]) * inv_stddev[k];
-      }
-
-      p += dim;
-    }
+    mat.array() = (mat.array().rowwise() + neg_mean_vec.array()).rowwise() *
+                  inv_stddev_vec.array();
   }
 
   OfflineRecognizerConfig config_;

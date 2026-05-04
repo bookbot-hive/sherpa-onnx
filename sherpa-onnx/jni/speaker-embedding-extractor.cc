@@ -3,34 +3,28 @@
 // Copyright (c)  2024  Xiaomi Corporation
 #include "sherpa-onnx/csrc/speaker-embedding-extractor.h"
 
+#include <memory>
+#include <vector>
+
 #include "sherpa-onnx/jni/common.h"
 
 namespace sherpa_onnx {
 
 static SpeakerEmbeddingExtractorConfig GetSpeakerEmbeddingExtractorConfig(
-    JNIEnv *env, jobject config) {
+    JNIEnv *env, jobject config, bool *ok) {
   SpeakerEmbeddingExtractorConfig ans;
 
   jclass cls = env->GetObjectClass(config);
 
-  jfieldID fid = env->GetFieldID(cls, "model", "Ljava/lang/String;");
-  jstring s = (jstring)env->GetObjectField(config, fid);
-  const char *p = env->GetStringUTFChars(s, nullptr);
+  SHERPA_ONNX_JNI_READ_STRING(ans.model, model, cls, config);
 
-  ans.model = p;
-  env->ReleaseStringUTFChars(s, p);
+  SHERPA_ONNX_JNI_READ_INT(ans.num_threads, numThreads, cls, config);
 
-  fid = env->GetFieldID(cls, "numThreads", "I");
-  ans.num_threads = env->GetIntField(config, fid);
+  SHERPA_ONNX_JNI_READ_BOOL(ans.debug, debug, cls, config);
 
-  fid = env->GetFieldID(cls, "debug", "Z");
-  ans.debug = env->GetBooleanField(config, fid);
+  SHERPA_ONNX_JNI_READ_STRING(ans.provider, provider, cls, config);
 
-  fid = env->GetFieldID(cls, "provider", "Ljava/lang/String;");
-  s = (jstring)env->GetObjectField(config, fid);
-  p = env->GetStringUTFChars(s, nullptr);
-  ans.provider = p;
-  env->ReleaseStringUTFChars(s, p);
+  *ok = true;
 
   return ans;
 }
@@ -45,9 +39,18 @@ Java_com_k2fsa_sherpa_onnx_SpeakerEmbeddingExtractor_newFromAsset(
   AAssetManager *mgr = AAssetManager_fromJava(env, asset_manager);
   if (!mgr) {
     SHERPA_ONNX_LOGE("Failed to get asset manager: %p", mgr);
+    return 0;
   }
 #endif
-  auto config = sherpa_onnx::GetSpeakerEmbeddingExtractorConfig(env, _config);
+  bool ok = false;
+  auto config =
+      sherpa_onnx::GetSpeakerEmbeddingExtractorConfig(env, _config, &ok);
+
+  if (!ok) {
+    SHERPA_ONNX_LOGE("Please read the error message carefully");
+    return 0;
+  }
+
   SHERPA_ONNX_LOGE("new config:\n%s", config.ToString().c_str());
 
   auto extractor = new sherpa_onnx::SpeakerEmbeddingExtractor(
@@ -63,11 +66,20 @@ SHERPA_ONNX_EXTERN_C
 JNIEXPORT jlong JNICALL
 Java_com_k2fsa_sherpa_onnx_SpeakerEmbeddingExtractor_newFromFile(
     JNIEnv *env, jobject /*obj*/, jobject _config) {
-  auto config = sherpa_onnx::GetSpeakerEmbeddingExtractorConfig(env, _config);
+  bool ok = false;
+  auto config =
+      sherpa_onnx::GetSpeakerEmbeddingExtractorConfig(env, _config, &ok);
+
+  if (!ok) {
+    SHERPA_ONNX_LOGE("Please read the error message carefully");
+    return 0;
+  }
+
   SHERPA_ONNX_LOGE("newFromFile config:\n%s", config.ToString().c_str());
 
   if (!config.Validate()) {
     SHERPA_ONNX_LOGE("Errors found in config!");
+    return 0;
   }
 
   auto extractor = new sherpa_onnx::SpeakerEmbeddingExtractor(config);
@@ -77,7 +89,7 @@ Java_com_k2fsa_sherpa_onnx_SpeakerEmbeddingExtractor_newFromFile(
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT void JNICALL
-Java_com_k2fsa_sherpa_onnx_SpeakerEmbeddingExtractor_delete(JNIEnv *env,
+Java_com_k2fsa_sherpa_onnx_SpeakerEmbeddingExtractor_delete(JNIEnv * /*env*/,
                                                             jobject /*obj*/,
                                                             jlong ptr) {
   delete reinterpret_cast<sherpa_onnx::SpeakerEmbeddingExtractor *>(ptr);
@@ -86,7 +98,7 @@ Java_com_k2fsa_sherpa_onnx_SpeakerEmbeddingExtractor_delete(JNIEnv *env,
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT jlong JNICALL
 Java_com_k2fsa_sherpa_onnx_SpeakerEmbeddingExtractor_createStream(
-    JNIEnv *env, jobject /*obj*/, jlong ptr) {
+    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr) {
   std::unique_ptr<sherpa_onnx::OnlineStream> s =
       reinterpret_cast<sherpa_onnx::SpeakerEmbeddingExtractor *>(ptr)
           ->CreateStream();
@@ -101,7 +113,7 @@ Java_com_k2fsa_sherpa_onnx_SpeakerEmbeddingExtractor_createStream(
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT jboolean JNICALL
-Java_com_k2fsa_sherpa_onnx_SpeakerEmbeddingExtractor_isReady(JNIEnv *env,
+Java_com_k2fsa_sherpa_onnx_SpeakerEmbeddingExtractor_isReady(JNIEnv * /*env*/,
                                                              jobject /*obj*/,
                                                              jlong ptr,
                                                              jlong stream_ptr) {
@@ -130,7 +142,7 @@ Java_com_k2fsa_sherpa_onnx_SpeakerEmbeddingExtractor_compute(JNIEnv *env,
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT jint JNICALL Java_com_k2fsa_sherpa_onnx_SpeakerEmbeddingExtractor_dim(
-    JNIEnv *env, jobject /*obj*/, jlong ptr) {
+    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr) {
   auto extractor =
       reinterpret_cast<sherpa_onnx::SpeakerEmbeddingExtractor *>(ptr);
   return extractor->Dim();

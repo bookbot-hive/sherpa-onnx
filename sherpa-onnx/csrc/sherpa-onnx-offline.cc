@@ -4,11 +4,13 @@
 
 #include <stdio.h>
 
-#include <chrono>  // NOLINT
+#include <chrono>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "sherpa-onnx/csrc/offline-recognizer.h"
+#include "sherpa-onnx/csrc/macros.h"
 #include "sherpa-onnx/csrc/parse-options.h"
 #include "sherpa-onnx/csrc/wave-reader.h"
 
@@ -43,7 +45,20 @@ See https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-paraformer/in
     --decoding-method=greedy_search \
     /path/to/foo.wav [bar.wav foobar.wav ...]
 
-(3) Whisper models
+(3) Moonshine models
+
+See https://k2-fsa.github.io/sherpa/onnx/moonshine/index.html
+
+  ./bin/sherpa-onnx-offline \
+    --moonshine-preprocessor=/Users/fangjun/open-source/sherpa-onnx/scripts/moonshine/preprocess.onnx \
+    --moonshine-encoder=/Users/fangjun/open-source/sherpa-onnx/scripts/moonshine/encode.int8.onnx \
+    --moonshine-uncached-decoder=/Users/fangjun/open-source/sherpa-onnx/scripts/moonshine/uncached_decode.int8.onnx \
+    --moonshine-cached-decoder=/Users/fangjun/open-source/sherpa-onnx/scripts/moonshine/cached_decode.int8.onnx \
+    --tokens=/Users/fangjun/open-source/sherpa-onnx/scripts/moonshine/tokens.txt \
+    --num-threads=1 \
+    /path/to/foo.wav [bar.wav foobar.wav ...]
+
+(4) Whisper models
 
 See https://k2-fsa.github.io/sherpa/onnx/pretrained_models/whisper/tiny.en.html
 
@@ -54,7 +69,7 @@ See https://k2-fsa.github.io/sherpa/onnx/pretrained_models/whisper/tiny.en.html
     --num-threads=1 \
     /path/to/foo.wav [bar.wav foobar.wav ...]
 
-(4) NeMo CTC models
+(5) NeMo CTC models
 
 See https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-ctc/index.html
 
@@ -68,7 +83,7 @@ See https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-ctc/index.htm
     ./sherpa-onnx-nemo-ctc-en-conformer-medium/test_wavs/1.wav \
     ./sherpa-onnx-nemo-ctc-en-conformer-medium/test_wavs/8k.wav
 
-(5) TDNN CTC model for the yesno recipe from icefall
+(6) TDNN CTC model for the yesno recipe from icefall
 
 See https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-ctc/yesno/index.html
       //
@@ -79,6 +94,17 @@ See https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-ctc/yesno/ind
     --tdnn-model=./sherpa-onnx-tdnn-yesno/model-epoch-14-avg-2.onnx \
     ./sherpa-onnx-tdnn-yesno/test_wavs/0_0_0_1_0_0_0_1.wav \
     ./sherpa-onnx-tdnn-yesno/test_wavs/0_0_1_0_0_0_1_0.wav
+
+(7) FunASR-nano models
+
+See https://github.com/FunAudioLLM/Fun-ASR-Nano-2512
+
+  ./bin/sherpa-onnx-offline \
+    --funasr-nano-encoder-adaptor=/path/to/encoder_adaptor.onnx \
+    --funasr-nano-llm=/path/to/llm.onnx \
+    --funasr-nano-tokenizer=/path/to/Qwen3-0.6B \
+    --funasr-nano-embedding=/path/to/embedding.onnx \
+    /path/to/foo.wav [bar.wav foobar.wav ...]
 
 Note: It supports decoding multiple files in batches
 
@@ -98,7 +124,7 @@ for a list of pre-trained models to download.
   if (po.NumArgs() < 1) {
     fprintf(stderr, "Error: Please provide at least 1 wave file.\n\n");
     po.PrintUsage();
-    exit(EXIT_FAILURE);
+    SHERPA_ONNX_EXIT(EXIT_FAILURE);
   }
 
   fprintf(stderr, "%s\n", config.ToString().c_str());
@@ -109,7 +135,17 @@ for a list of pre-trained models to download.
   }
 
   fprintf(stderr, "Creating recognizer ...\n");
+  const auto begin_init = std::chrono::steady_clock::now();
+
   sherpa_onnx::OfflineRecognizer recognizer(config);
+
+  const auto end_init = std::chrono::steady_clock::now();
+  float elapsed_seconds_init =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end_init -
+                                                            begin_init)
+          .count() /
+      1000.;
+  fprintf(stderr, "recognizer created in %.3f s\n", elapsed_seconds_init);
 
   fprintf(stderr, "Started\n");
   const auto begin = std::chrono::steady_clock::now();
@@ -118,13 +154,13 @@ for a list of pre-trained models to download.
   std::vector<sherpa_onnx::OfflineStream *> ss_pointers;
   float duration = 0;
   for (int32_t i = 1; i <= po.NumArgs(); ++i) {
-    const std::string wav_filename = po.GetArg(i);
+    std::string wav_filename = po.GetArg(i);
     int32_t sampling_rate = -1;
     bool is_ok = false;
-    const std::vector<float> samples =
+    std::vector<float> samples =
         sherpa_onnx::ReadWave(wav_filename, &sampling_rate, &is_ok);
     if (!is_ok) {
-      fprintf(stderr, "Failed to read %s\n", wav_filename.c_str());
+      fprintf(stderr, "Failed to read '%s'\n", wav_filename.c_str());
       return -1;
     }
     duration += samples.size() / static_cast<float>(sampling_rate);
@@ -142,8 +178,9 @@ for a list of pre-trained models to download.
 
   fprintf(stderr, "Done!\n\n");
   for (int32_t i = 1; i <= po.NumArgs(); ++i) {
-    fprintf(stderr, "%s\n%s\n----\n", po.GetArg(i).c_str(),
-            ss[i - 1]->GetResult().AsJsonString().c_str());
+    fprintf(stderr, "%s\n", po.GetArg(i).c_str());
+    fprintf(stdout, "%s\n", ss[i - 1]->GetResult().AsJsonString().c_str());
+    fprintf(stderr, "----\n");
   }
 
   float elapsed_seconds =

@@ -4,13 +4,16 @@
 
 #include "sherpa-onnx/csrc/spoken-language-identification.h"
 
+#include <memory>
+#include <string>
+
 #include "sherpa-onnx/csrc/macros.h"
 #include "sherpa-onnx/jni/common.h"
 
 namespace sherpa_onnx {
 
 static SpokenLanguageIdentificationConfig GetSpokenLanguageIdentificationConfig(
-    JNIEnv *env, jobject config) {
+    JNIEnv *env, jobject config, bool *ok) {
   SpokenLanguageIdentificationConfig ans;
 
   jclass cls = env->GetObjectClass(config);
@@ -21,34 +24,22 @@ static SpokenLanguageIdentificationConfig GetSpokenLanguageIdentificationConfig(
   jobject whisper = env->GetObjectField(config, fid);
   jclass whisper_cls = env->GetObjectClass(whisper);
 
-  fid = env->GetFieldID(whisper_cls, "encoder", "Ljava/lang/String;");
+  SHERPA_ONNX_JNI_READ_STRING(ans.whisper.encoder, encoder, whisper_cls,
+                              whisper);
 
-  jstring s = (jstring)env->GetObjectField(whisper, fid);
-  const char *p = env->GetStringUTFChars(s, nullptr);
-  ans.whisper.encoder = p;
-  env->ReleaseStringUTFChars(s, p);
+  SHERPA_ONNX_JNI_READ_STRING(ans.whisper.decoder, decoder, whisper_cls,
+                              whisper);
 
-  fid = env->GetFieldID(whisper_cls, "decoder", "Ljava/lang/String;");
-  s = (jstring)env->GetObjectField(whisper, fid);
-  p = env->GetStringUTFChars(s, nullptr);
-  ans.whisper.decoder = p;
-  env->ReleaseStringUTFChars(s, p);
+  SHERPA_ONNX_JNI_READ_INT(ans.whisper.tail_paddings, tailPaddings, whisper_cls,
+                           whisper);
 
-  fid = env->GetFieldID(whisper_cls, "tailPaddings", "I");
-  ans.whisper.tail_paddings = env->GetIntField(whisper, fid);
+  SHERPA_ONNX_JNI_READ_INT(ans.num_threads, numThreads, cls, config);
 
-  fid = env->GetFieldID(cls, "numThreads", "I");
-  ans.num_threads = env->GetIntField(config, fid);
+  SHERPA_ONNX_JNI_READ_BOOL(ans.debug, debug, cls, config);
 
-  fid = env->GetFieldID(cls, "debug", "Z");
-  ans.debug = env->GetBooleanField(config, fid);
+  SHERPA_ONNX_JNI_READ_STRING(ans.provider, provider, cls, config);
 
-  fid = env->GetFieldID(cls, "provider", "Ljava/lang/String;");
-  s = (jstring)env->GetObjectField(config, fid);
-  p = env->GetStringUTFChars(s, nullptr);
-  ans.provider = p;
-  env->ReleaseStringUTFChars(s, p);
-
+  *ok = true;
   return ans;
 }
 
@@ -62,11 +53,19 @@ Java_com_k2fsa_sherpa_onnx_SpokenLanguageIdentification_newFromAsset(
   AAssetManager *mgr = AAssetManager_fromJava(env, asset_manager);
   if (!mgr) {
     SHERPA_ONNX_LOGE("Failed to get asset manager: %p", mgr);
+    return 0;
   }
 #endif
 
+  bool ok = false;
   auto config =
-      sherpa_onnx::GetSpokenLanguageIdentificationConfig(env, _config);
+      sherpa_onnx::GetSpokenLanguageIdentificationConfig(env, _config, &ok);
+
+  if (!ok) {
+    SHERPA_ONNX_LOGE("Please read the error message carefully");
+    return 0;
+  }
+
   SHERPA_ONNX_LOGE("spoken language identification newFromAsset config:\n%s",
                    config.ToString().c_str());
 
@@ -84,8 +83,15 @@ SHERPA_ONNX_EXTERN_C
 JNIEXPORT jlong JNICALL
 Java_com_k2fsa_sherpa_onnx_SpokenLanguageIdentification_newFromFile(
     JNIEnv *env, jobject /*obj*/, jobject _config) {
+  bool ok = false;
   auto config =
-      sherpa_onnx::GetSpokenLanguageIdentificationConfig(env, _config);
+      sherpa_onnx::GetSpokenLanguageIdentificationConfig(env, _config, &ok);
+
+  if (!ok) {
+    SHERPA_ONNX_LOGE("Please read the error message carefully");
+    return 0;
+  }
+
   SHERPA_ONNX_LOGE("SpokenLanguageIdentification newFromFile config:\n%s",
                    config.ToString().c_str());
 
@@ -101,7 +107,7 @@ Java_com_k2fsa_sherpa_onnx_SpokenLanguageIdentification_newFromFile(
 
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT void JNICALL
-Java_com_k2fsa_sherpa_onnx_SpokenLanguageIdentification_delete(JNIEnv *env,
+Java_com_k2fsa_sherpa_onnx_SpokenLanguageIdentification_delete(JNIEnv * /*env*/,
                                                                jobject /*obj*/,
                                                                jlong ptr) {
   delete reinterpret_cast<sherpa_onnx::SpokenLanguageIdentification *>(ptr);
@@ -110,7 +116,7 @@ Java_com_k2fsa_sherpa_onnx_SpokenLanguageIdentification_delete(JNIEnv *env,
 SHERPA_ONNX_EXTERN_C
 JNIEXPORT jlong JNICALL
 Java_com_k2fsa_sherpa_onnx_SpokenLanguageIdentification_createStream(
-    JNIEnv *env, jobject /*obj*/, jlong ptr) {
+    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr) {
   auto slid =
       reinterpret_cast<sherpa_onnx::SpokenLanguageIdentification *>(ptr);
   std::unique_ptr<sherpa_onnx::OfflineStream> s = slid->CreateStream();
@@ -134,5 +140,5 @@ Java_com_k2fsa_sherpa_onnx_SpokenLanguageIdentification_compute(JNIEnv *env,
   sherpa_onnx::OfflineStream *s =
       reinterpret_cast<sherpa_onnx::OfflineStream *>(s_ptr);
   std::string lang = slid->Compute(s);
-  return env->NewStringUTF(lang.c_str());
+  return SafeNewStringUTF(env, lang);
 }

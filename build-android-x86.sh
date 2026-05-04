@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -ex
 
+if [ x$BUILD_SHARED_LIBS == xOFF ]; then
+  echo "BUILD_SHARED_LIBS=OFF is ignored for Android x86."
+  echo "Always link with libonnxruntime.so"
+  sleep 2
+fi
+
 dir=$PWD/build-android-x86
 
 mkdir -p $dir
@@ -43,7 +49,7 @@ fi
 echo "ANDROID_NDK: $ANDROID_NDK"
 sleep 1
 
-onnxruntime_version=1.17.1
+onnxruntime_version=1.24.3
 
 if [ ! -f $onnxruntime_version/jni/x86/libonnxruntime.so ]; then
   mkdir -p $onnxruntime_version
@@ -64,12 +70,25 @@ if [ -z $SHERPA_ONNX_ENABLE_TTS ]; then
   SHERPA_ONNX_ENABLE_TTS=ON
 fi
 
+if [ -z $SHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION ]; then
+  SHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION=ON
+fi
+
 if [ -z $SHERPA_ONNX_ENABLE_BINARY ]; then
   SHERPA_ONNX_ENABLE_BINARY=OFF
 fi
 
+if [ -z $SHERPA_ONNX_ENABLE_C_API ]; then
+  SHERPA_ONNX_ENABLE_C_API=OFF
+fi
+
+if [ -z $SHERPA_ONNX_ENABLE_JNI ]; then
+  SHERPA_ONNX_ENABLE_JNI=ON
+fi
+
 cmake -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK/build/cmake/android.toolchain.cmake" \
     -DSHERPA_ONNX_ENABLE_TTS=$SHERPA_ONNX_ENABLE_TTS \
+    -DSHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION=$SHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION \
     -DSHERPA_ONNX_ENABLE_BINARY=$SHERPA_ONNX_ENABLE_BINARY \
     -DBUILD_PIPER_PHONMIZE_EXE=OFF \
     -DBUILD_PIPER_PHONMIZE_TESTS=OFF \
@@ -81,10 +100,10 @@ cmake -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK/build/cmake/android.toolchain.cmake" 
     -DSHERPA_ONNX_ENABLE_TESTS=OFF \
     -DSHERPA_ONNX_ENABLE_CHECK=OFF \
     -DSHERPA_ONNX_ENABLE_PORTAUDIO=OFF \
-    -DSHERPA_ONNX_ENABLE_JNI=ON \
+    -DSHERPA_ONNX_ENABLE_JNI=$SHERPA_ONNX_ENABLE_JNI \
     -DCMAKE_INSTALL_PREFIX=./install \
     -DANDROID_ABI="x86" \
-    -DSHERPA_ONNX_ENABLE_C_API=OFF \
+    -DSHERPA_ONNX_ENABLE_C_API=$SHERPA_ONNX_ENABLE_C_API \
     -DSHERPA_ONNX_ENABLE_WEBSOCKET=OFF \
     -DANDROID_PLATFORM=android-21 ..
 
@@ -93,3 +112,20 @@ make -j4
 make install/strip
 cp -fv $onnxruntime_version/jni/x86/libonnxruntime.so install/lib
 rm -rf install/lib/pkgconfig
+
+if [ -f install/lib/libsherpa-onnx-c-api.so ]; then
+  cat >install/lib/README.md <<EOF
+# Introduction
+
+Note that if you use Android Studio, then you only need to
+copy libonnxruntime.so and libsherpa-onnx-jni.so
+to your jniLibs, and you don't need libsherpa-onnx-c-api.so or
+libsherpa-onnx-cxx-api.so.
+
+libsherpa-onnx-c-api.so and libsherpa-onnx-cxx-api.so are for users
+who don't use JNI. In that case, libsherpa-onnx-jni.so is not needed.
+
+In any case, libonnxruntime.so is always needed.
+EOF
+  ls -lh install/lib/README.md
+fi
