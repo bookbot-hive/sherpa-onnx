@@ -20,6 +20,10 @@ struct OfflineTtsPocketModelConfig {
 
   std::string vocab_json;
   std::string token_scores_json;
+  // Optional. Path to a pre-baked voice-state .bin produced by
+  // bin/prebake-pocket-voice. When set, the encoder ONNX is not loaded
+  // and the LM voice-conditioning pass is skipped.
+  std::string voice_state;
 
   OfflineTtsPocketModelConfig() = default;
   int32_t voice_embedding_cache_capacity = 50;
@@ -31,6 +35,7 @@ struct OfflineTtsPocketModelConfig {
                               const std::string &text_conditioner,
                               const std::string &vocab_json,
                               const std::string &token_scores_json,
+                              const std::string &voice_state = "",
                               int32_t voice_embedding_cache_capacity = 50)
       : lm_flow(lm_flow),
         lm_main(lm_main),
@@ -39,6 +44,7 @@ struct OfflineTtsPocketModelConfig {
         text_conditioner(text_conditioner),
         vocab_json(vocab_json),
         token_scores_json(token_scores_json),
+        voice_state(voice_state),
         voice_embedding_cache_capacity(voice_embedding_cache_capacity) {}
 
   void Register(ParseOptions *po);

@@ -23,6 +23,8 @@ void OfflineTtsPocketModelConfig::Register(ParseOptions *po) {
                "Path to PocketTTS vocab.json");
   po->Register("pocket-token-scores-json", &token_scores_json,
                "Path to PocketTTS token_scores.json");
+  po->Register("pocket-voice-state", &voice_state,
+               "Path to pre-baked voice-state .bin (optional; skips encoder load when set).");
   po->Register("pocket-voice-embedding-cache-capacity",
                &voice_embedding_cache_capacity,
                "Capacity of the voice embedding cache (number of items). "
@@ -103,6 +105,12 @@ bool OfflineTtsPocketModelConfig::Validate() const {
     return false;
   }
 
+  if (!voice_state.empty() && !FileExists(voice_state)) {
+    SHERPA_ONNX_LOGE("--pocket-voice-state '%s' does not exist",
+                     voice_state.c_str());
+    return false;
+  }
+
   if (voice_embedding_cache_capacity < 0) {
     SHERPA_ONNX_LOGE(
         "voice_embedding_cache_capacity must be non-negative. Given: %d",
@@ -124,6 +132,7 @@ std::string OfflineTtsPocketModelConfig::ToString() const {
   os << "text_conditioner=\"" << text_conditioner << "\", ";
   os << "vocab_json=\"" << vocab_json << "\", ";
   os << "token_scores_json=\"" << token_scores_json << "\", ";
+  os << "voice_state=\"" << voice_state << "\", ";
   os << "voice_embedding_cache_capacity=" << voice_embedding_cache_capacity
      << ")";
 
