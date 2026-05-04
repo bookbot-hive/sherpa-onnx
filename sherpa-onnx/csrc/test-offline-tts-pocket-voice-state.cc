@@ -32,6 +32,7 @@ TEST(PocketVoiceState, RoundTrip) {
   ASSERT_EQ(loaded.tensors.size(), 2u);
   EXPECT_EQ(loaded.tensors[0].name, "state_in_layer_0_k");
   EXPECT_EQ(loaded.tensors[0].shape, (std::vector<int64_t>{1, 8, 16}));
+  EXPECT_EQ(loaded.tensors[0].data[3], 0.5f);
   EXPECT_EQ(loaded.tensors[1].data[3], -0.25f);
   std::remove(path.c_str());
 }

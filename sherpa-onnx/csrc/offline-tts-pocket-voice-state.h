@@ -29,8 +29,10 @@ struct PocketVoiceStateTensor {
 //   for each tensor:
 //     name_len: uint32
 //     name: name_len bytes, UTF-8
-//     proto_len: uint32
-//     proto: ONNX TensorProto serialized via SerializeToString()
+//     ndim: uint32_le
+//     shape: ndim × int64_le
+//     nfloat: uint32_le
+//     data: nfloat × float32_le
 struct PocketVoiceState {
   uint32_t version = 1;
   std::vector<PocketVoiceStateTensor> tensors;
