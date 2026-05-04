@@ -13,6 +13,9 @@ namespace sherpa_onnx {
 namespace {
 
 constexpr char kMagic[8] = {'S', 'H', 'P', 'R', 'P', 'V', 'S', '\0'};
+constexpr uint32_t kMaxTensorCount = 1024;
+constexpr uint32_t kMaxNameLen = 256;
+constexpr uint32_t kMaxFloatCount = 64u * 1024u * 1024u;  // 256 MB of float32
 
 bool WriteU32(std::ostream &os, uint32_t v) {
   char b[4] = {static_cast<char>(v & 0xff), static_cast<char>((v >> 8) & 0xff),
@@ -71,6 +74,10 @@ bool PocketVoiceState::SaveToFile(const std::string &path,
     return false;
   }
   os.write(kMagic, sizeof(kMagic));
+  if (!os.good()) {
+    *err_msg = "write magic failed";
+    return false;
+  }
   if (!WriteU32(os, version)) {
     *err_msg = "write version failed";
     return false;
@@ -120,7 +127,10 @@ bool PocketVoiceState::LoadFromFile(const std::string &path,
     return false;
   }
   char magic[sizeof(kMagic)];
-  is.read(magic, sizeof(kMagic));
+  if (!is.read(magic, sizeof(kMagic))) {
+    *err_msg = "truncated file or read error in " + path;
+    return false;
+  }
   if (std::memcmp(magic, kMagic, sizeof(kMagic)) != 0) {
     *err_msg = "bad magic in " + path;
     return false;
@@ -140,6 +150,12 @@ bool PocketVoiceState::LoadFromFile(const std::string &path,
     *err_msg = "read tensor_count failed";
     return false;
   }
+  if (n > kMaxTensorCount) {
+    std::ostringstream o;
+    o << "tensor_count " << n << " exceeds max " << kMaxTensorCount;
+    *err_msg = o.str();
+    return false;
+  }
   out->tensors.clear();
   out->tensors.reserve(n);
   for (uint32_t i = 0; i < n; ++i) {
@@ -147,6 +163,12 @@ bool PocketVoiceState::LoadFromFile(const std::string &path,
     uint32_t name_len = 0;
     if (!ReadU32(is, &name_len)) {
       *err_msg = "read name_len failed";
+      return false;
+    }
+    if (name_len > kMaxNameLen) {
+      std::ostringstream o;
+      o << "name_len " << name_len << " exceeds max " << kMaxNameLen;
+      *err_msg = o.str();
       return false;
     }
     t.name.resize(name_len);
@@ -169,6 +191,12 @@ bool PocketVoiceState::LoadFromFile(const std::string &path,
     uint32_t nfloat = 0;
     if (!ReadU32(is, &nfloat)) {
       *err_msg = "read nfloat failed for " + t.name;
+      return false;
+    }
+    if (nfloat > kMaxFloatCount) {
+      std::ostringstream o;
+      o << "nfloat " << nfloat << " exceeds max " << kMaxFloatCount;
+      *err_msg = o.str();
       return false;
     }
     t.data.resize(nfloat);

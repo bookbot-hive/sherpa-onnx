@@ -5,8 +5,6 @@
 #ifndef SHERPA_ONNX_CSRC_OFFLINE_TTS_POCKET_VOICE_STATE_H_
 #define SHERPA_ONNX_CSRC_OFFLINE_TTS_POCKET_VOICE_STATE_H_
 
-#include <onnxruntime_cxx_api.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
