@@ -266,8 +266,11 @@ class OfflineTtsPocketImpl : public OfflineTtsImpl {
         };
       }
 
+      Ort::Value embedding_arg = model_->HasVoiceState()
+                                     ? Ort::Value{nullptr}
+                                     : View(&voice_embedding);
       GeneratedAudio cur = GenerateSingleSentence(sentences[i], gen_config,
-                                                  View(&voice_embedding),
+                                                  std::move(embedding_arg),
                                                   should_continue, wrapped_cb);
 
       if (cur.samples.empty()) {
