@@ -1,4 +1,6 @@
 // sherpa-onnx/csrc/offline-tts-pocket-voice-state.h
+//
+// Copyright (c)  2026  Xiaomi Corporation
 
 #ifndef SHERPA_ONNX_CSRC_OFFLINE_TTS_POCKET_VOICE_STATE_H_
 #define SHERPA_ONNX_CSRC_OFFLINE_TTS_POCKET_VOICE_STATE_H_
@@ -6,7 +8,6 @@
 #include <onnxruntime_cxx_api.h>
 
 #include <cstdint>
-#include <map>
 #include <string>
 #include <vector>
 
