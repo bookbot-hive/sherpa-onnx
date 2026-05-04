@@ -230,9 +230,12 @@ class OfflineTtsPocketImpl : public OfflineTtsImpl {
 
     sentences = std::move(final_chunks);
 
-    Ort::Value voice_embedding = GetVoiceEmbedding(gen_config);
-    if (!voice_embedding) {
-      return {};
+    Ort::Value voice_embedding{nullptr};
+    if (!model_->HasVoiceState()) {
+      voice_embedding = GetVoiceEmbedding(gen_config);
+      if (!voice_embedding) {
+        return {};
+      }
     }
 
     GeneratedAudio result;
@@ -307,7 +310,9 @@ class OfflineTtsPocketImpl : public OfflineTtsImpl {
       GeneratedAudioCallback callback = nullptr) const {
     Ort::Value text_embedding = GetTextEmbedding(text);
 
-    auto lm_main_state = model_->GetLmMainInitState();
+    auto lm_main_state = model_->HasVoiceState()
+                             ? model_->GetPreBakedLmMainState()
+                             : model_->GetLmMainInitState();
 
     auto memory_info =
         Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
@@ -315,14 +320,20 @@ class OfflineTtsPocketImpl : public OfflineTtsImpl {
     {
       std::array<int64_t, 3> empty_seq_shape = {1, 0, 32};
 
+      if (!model_->HasVoiceState()) {
+        Ort::Value empty_seq_tensor_voice = Ort::Value::CreateTensor<float>(
+            memory_info, nullptr, 0, empty_seq_shape.data(),
+            empty_seq_shape.size());
+
+        // voice conditioning
+        // discard the return result
+        RunLmMain(View(&empty_seq_tensor_voice), std::move(voice_embedding),
+                  lm_main_state);
+      }
+
       Ort::Value empty_seq_tensor = Ort::Value::CreateTensor<float>(
           memory_info, nullptr, 0, empty_seq_shape.data(),
           empty_seq_shape.size());
-
-      // voice conditioning
-      // discard the return result
-      RunLmMain(View(&empty_seq_tensor), std::move(voice_embedding),
-                lm_main_state);
 
       // text conditioning
       // discard the return result

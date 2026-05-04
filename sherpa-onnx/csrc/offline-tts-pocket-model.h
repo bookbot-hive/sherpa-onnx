@@ -35,6 +35,8 @@ class OfflineTtsPocketModel {
   ~OfflineTtsPocketModel();
 
   PocketLmMainState GetLmMainInitState() const;
+  bool HasVoiceState() const;
+  PocketLmMainState GetPreBakedLmMainState() const;
   PocketMimiDecoderState GetMimiDecoderInitState() const;
 
   /**

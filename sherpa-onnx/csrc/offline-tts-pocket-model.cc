@@ -21,6 +21,7 @@
 
 #include "sherpa-onnx/csrc/macros.h"
 #include "sherpa-onnx/csrc/onnx-utils.h"
+#include "sherpa-onnx/csrc/offline-tts-pocket-voice-state.h"
 #include "sherpa-onnx/csrc/session.h"
 #include "sherpa-onnx/csrc/text-utils.h"
 #include "sherpa-onnx/csrc/file-utils.h"
@@ -79,9 +80,13 @@ class OfflineTtsPocketModel::Impl {
         env_, SHERPA_ONNX_TO_ORT_PATH(config.pocket.lm_main), sess_opts_);
     InitLmMain(nullptr, 0);
 
-    mimi_encoder_sess_ = std::make_unique<Ort::Session>(
-        env_, SHERPA_ONNX_TO_ORT_PATH(config.pocket.encoder), sess_opts_);
-    InitMimiEncoder(nullptr, 0);
+    if (config.pocket.voice_state.empty()) {
+      mimi_encoder_sess_ = std::make_unique<Ort::Session>(
+          env_, SHERPA_ONNX_TO_ORT_PATH(config.pocket.encoder), sess_opts_);
+      InitMimiEncoder(nullptr, 0);
+    } else {
+      LoadVoiceState(config.pocket.voice_state);
+    }
 
     mimi_decoder_sess_ = std::make_unique<Ort::Session>(
         env_, SHERPA_ONNX_TO_ORT_PATH(config.pocket.decoder), sess_opts_);
@@ -108,9 +113,11 @@ class OfflineTtsPocketModel::Impl {
       InitLmMain(buf.data(), buf.size());
     }
 
-    {
+    if (config.pocket.voice_state.empty()) {
       auto buf = ReadFile(mgr, config.pocket.encoder);
       InitMimiEncoder(buf.data(), buf.size());
+    } else {
+      LoadVoiceState(config.pocket.voice_state);
     }
 
     {
@@ -131,6 +138,46 @@ class OfflineTtsPocketModel::Impl {
       s.values.push_back(View(&v));
     }
     return s;
+  }
+
+  bool HasVoiceState() const { return has_voice_state_; }
+
+  PocketLmMainState GetPreBakedLmMainState() const {
+    PocketLmMainState s;
+    s.values.reserve(voice_state_data_.size());
+    auto memory_info =
+        Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
+    for (size_t i = 0; i < voice_state_data_.size(); ++i) {
+      s.values.push_back(Ort::Value::CreateTensor<float>(
+          memory_info,
+          const_cast<float *>(voice_state_data_[i].data()),
+          voice_state_data_[i].size(), voice_state_shapes_[i].data(),
+          voice_state_shapes_[i].size()));
+    }
+    return s;
+  }
+
+  // Load a pre-baked voice state file. Populates voice_state_{data,shapes,names}_
+  // and sets has_voice_state_ = true. Exits the process on failure.
+  void LoadVoiceState(const std::string &path) {
+    PocketVoiceState vs;
+    std::string err;
+    if (!PocketVoiceState::LoadFromFile(path, &vs, &err)) {
+      SHERPA_ONNX_LOGE("Failed to load voice state from %s: %s",
+                       path.c_str(), err.c_str());
+      SHERPA_ONNX_EXIT(-1);
+    }
+    voice_state_data_.reserve(vs.tensors.size());
+    voice_state_shapes_.reserve(vs.tensors.size());
+    voice_state_names_.reserve(vs.tensors.size());
+    for (auto &t : vs.tensors) {
+      voice_state_data_.push_back(std::move(t.data));
+      voice_state_shapes_.push_back(std::move(t.shape));
+      voice_state_names_.push_back(std::move(t.name));
+    }
+    has_voice_state_ = true;
+    SHERPA_ONNX_LOGE("Loaded pre-baked voice state from %s (%zu tensors)",
+                     path.c_str(), voice_state_data_.size());
   }
 
   PocketMimiDecoderState GetMimiDecoderInitState() {
@@ -386,6 +433,14 @@ class OfflineTtsPocketModel::Impl {
 
   PocketLmMainState lm_main_init_states_;
   PocketMimiDecoderState mimi_decoder_init_states_;
+
+  // Pre-baked voice state, populated when config.pocket.voice_state is set.
+  // The data buffers MUST outlive any Ort::Value that refers to them, so we
+  // keep them as members rather than locals.
+  bool has_voice_state_ = false;
+  std::vector<std::vector<float>> voice_state_data_;
+  std::vector<std::vector<int64_t>> voice_state_shapes_;
+  std::vector<std::string> voice_state_names_;
 };
 
 OfflineTtsPocketModel::OfflineTtsPocketModel(
@@ -401,6 +456,14 @@ OfflineTtsPocketModel::~OfflineTtsPocketModel() = default;
 
 PocketLmMainState OfflineTtsPocketModel::GetLmMainInitState() const {
   return impl_->GetLmMainInitState();
+}
+
+bool OfflineTtsPocketModel::HasVoiceState() const {
+  return impl_->HasVoiceState();
+}
+
+PocketLmMainState OfflineTtsPocketModel::GetPreBakedLmMainState() const {
+  return impl_->GetPreBakedLmMainState();
 }
 
 PocketMimiDecoderState OfflineTtsPocketModel::GetMimiDecoderInitState() const {
