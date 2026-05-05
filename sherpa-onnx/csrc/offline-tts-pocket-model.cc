@@ -175,6 +175,35 @@ class OfflineTtsPocketModel::Impl {
       voice_state_shapes_.push_back(std::move(t.shape));
       voice_state_names_.push_back(std::move(t.name));
     }
+
+    // Validate against the lm_main session's expected state inputs. The first
+    // two slots are seq + embedding; slots 2..N are state inputs. The pre-baked
+    // tensors must match those state-input slots in count, names, and order.
+    if (lm_main_input_names_.size() < 2) {
+      SHERPA_ONNX_LOGE(
+          "lm_main has only %zu inputs; expected at least 2 (seq + embedding)",
+          lm_main_input_names_.size());
+      SHERPA_ONNX_EXIT(-1);
+    }
+    size_t expected = lm_main_input_names_.size() - 2;
+    if (voice_state_data_.size() != expected) {
+      SHERPA_ONNX_LOGE(
+          "Voice state file %s has %zu tensors but lm_main expects %zu state inputs",
+          path.c_str(), voice_state_data_.size(), expected);
+      SHERPA_ONNX_EXIT(-1);
+    }
+    for (size_t i = 0; i < voice_state_names_.size(); ++i) {
+      const std::string &expected_name = lm_main_input_names_[i + 2];
+      if (voice_state_names_[i] != expected_name) {
+        SHERPA_ONNX_LOGE(
+            "Voice state file %s tensor %zu has name '%s' but lm_main slot %zu "
+            "expects '%s'",
+            path.c_str(), i, voice_state_names_[i].c_str(), i + 2,
+            expected_name.c_str());
+        SHERPA_ONNX_EXIT(-1);
+      }
+    }
+
     has_voice_state_ = true;
     SHERPA_ONNX_LOGE("Loaded pre-baked voice state from %s (%zu tensors)",
                      path.c_str(), voice_state_data_.size());
